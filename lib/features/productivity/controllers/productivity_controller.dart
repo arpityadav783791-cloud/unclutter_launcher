@@ -12,7 +12,6 @@ import '../../focus_mode/controllers/focus_mode_controller.dart';
 import '../../focus_mode/views/focus_blocked_view.dart';
 import '../../scheduled_block/controllers/schedule_controller.dart';
 import '../../scheduled_block/views/schedule_blocked_view.dart';
-import '../../scheduled_block/models/schedule_config.dart';
 
 /// Central authority for every app launch decision.
 class ProductivityController extends GetxController {
