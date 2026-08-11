@@ -1,0 +1,59 @@
+import 'dart:convert';
+import 'package:get/get.dart';
+import '../../../core/services/storage_service.dart';
+import '../models/launcher_settings.dart';
+
+class SettingsService extends GetxService {
+  static const String _key = 'launcher_settings';
+  final StorageService _storage = Get.find<StorageService>();
+
+  LauncherSettings _settings = const LauncherSettings();
+
+  LauncherSettings get settings => _settings;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _load();
+  }
+
+  void _load() {
+    final raw = _storage.getString(_key);
+    if (raw == null || raw.isEmpty) {
+      _settings = const LauncherSettings();
+      return;
+    }
+    try {
+      _settings = LauncherSettings.fromMap(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
+    } catch (_) {
+      _settings = const LauncherSettings();
+    }
+  }
+
+  Future<void> _save() async {
+    await _storage.setString(_key, jsonEncode(_settings.toMap()));
+  }
+
+  Future<void> update(LauncherSettings newSettings) async {
+    _settings = newSettings;
+    await _save();
+  }
+
+  Future<void> setShowClock(bool value) async {
+    await update(_settings.copyWith(showClock: value));
+  }
+
+  Future<void> setShowDate(bool value) async {
+    await update(_settings.copyWith(showDate: value));
+  }
+
+  Future<void> setTextScale(double value) async {
+    await update(_settings.copyWith(textScale: value.clamp(0.85, 1.25)));
+  }
+
+  Future<void> setThemeMode(String mode) async {
+    await update(_settings.copyWith(themeMode: mode));
+  }
+}

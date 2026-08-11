@@ -1,21 +1,6 @@
-import 'package:go_router/go_router.dart';
-
-import '../../features/launcher/views/launcher_screen.dart';
-
-class AppRouter {
-  AppRouter._();
-
-  static final GoRouter router = GoRouter(
-    initialLocation: '/',
-
-    routes: [
-      GoRoute(
-        path: '/',
-        name: 'launcher',
-        builder: (context, state) {
-          return const LauncherScreen();
-        },
-      ),
-    ],
-  );
+class AppRoutes {
+  static const String launcher = '/';
+  static const String search = '/search';
+  static const String settings = '/settings';
+  static const String screenTime = '/screen-time';
 }

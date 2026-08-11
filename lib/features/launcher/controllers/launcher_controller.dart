@@ -1,42 +1,36 @@
-import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:get/get.dart';
-
-import '../../apps/models/app_model.dart';
-import '../../apps/services/native_app_service.dart';
+import 'package:intl/intl.dart';
 
 class LauncherController extends GetxController {
-  final NativeAppService _nativeAppService;
+  final RxString currentTime = ''.obs;
+  final RxString currentDate = ''.obs;
 
-  LauncherController({required NativeAppService nativeAppService})
-    : _nativeAppService = nativeAppService;
-
-  final RxBool isLoading = false.obs;
-
-  final RxList<AppModel> apps = <AppModel>[].obs;
-
-  final RxString errorMessage = ''.obs;
+  Timer? _timer;
 
   @override
   void onInit() {
     super.onInit();
-
-    loadApps();
+    _updateDateTime();
+    // Update every 30 seconds – good balance of accuracy vs battery
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _updateDateTime();
+    });
   }
 
-  Future<void> loadApps() async {
-    try {
-      isLoading.value = true;
-      errorMessage.value = '';
+  void _updateDateTime() {
+    final now = DateTime.now();
+    final newTime = DateFormat('h:mm a').format(now);
+    final newDate = DateFormat('EEEE, d MMMM').format(now);
 
-      final installedApps = await _nativeAppService.getInstalledApps();
+    // Only trigger rebuilds when values actually change
+    if (currentTime.value != newTime) currentTime.value = newTime;
+    if (currentDate.value != newDate) currentDate.value = newDate;
+  }
 
-      apps.assignAll(installedApps);
-    } on PlatformException catch (e) {
-      errorMessage.value = e.message ?? 'Unable to load installed apps.';
-    } catch (e) {
-      errorMessage.value = 'Unable to load installed apps.';
-    } finally {
-      isLoading.value = false;
-    }
+  @override
+  void onClose() {
+    _timer?.cancel();
+    super.onClose();
   }
 }

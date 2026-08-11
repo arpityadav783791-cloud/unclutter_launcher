@@ -1,60 +1,71 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 
 class AppTheme {
-  AppTheme._();
+  static ThemeData get light => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: AppColors.lightBackground,
+        colorScheme: const ColorScheme.light(
+          primary: AppColors.accent,
+          surface: AppColors.lightBackground,
+          onSurface: AppColors.lightText,
+        ),
+        textTheme: _textTheme(AppColors.lightText, AppColors.lightSecondary),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+        ),
+      );
 
-  static const _lightTextColor = Colors.black;
-  static const _darkTextColor = Colors.white;
+  static ThemeData get dark => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: AppColors.darkBackground,
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.accent,
+          surface: AppColors.darkBackground,
+          onSurface: AppColors.darkText,
+        ),
+        textTheme: _textTheme(AppColors.darkText, AppColors.darkSecondary),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+        ),
+      );
 
-  static ThemeData lightTheme = ThemeData(
-    brightness: Brightness.light,
-    scaffoldBackgroundColor: Colors.white,
-    useMaterial3: true,
-
-    colorScheme: const ColorScheme.light(
-      primary: _lightTextColor,
-      onPrimary: Colors.white,
-      surface: Colors.white,
-      onSurface: _lightTextColor,
-    ),
-
-    textTheme: const TextTheme(
-      bodyLarge: TextStyle(
-        fontSize: 20,
-        color: _lightTextColor,
+  static TextTheme _textTheme(Color primary, Color secondary) {
+    return TextTheme(
+      displayLarge: TextStyle(
+        fontSize: 48,
+        fontWeight: FontWeight.w300,
+        color: primary,
+        letterSpacing: -1.0,
+      ),
+      headlineMedium: TextStyle(
+        fontSize: 22,
         fontWeight: FontWeight.w400,
+        color: primary,
+      ),
+      bodyLarge: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w400,
+        color: primary,
+        height: 1.4,
       ),
       bodyMedium: TextStyle(
-        fontSize: 18,
-        color: _lightTextColor,
+        fontSize: 16,
         fontWeight: FontWeight.w400,
+        color: secondary,
       ),
-    ),
-  );
-
-  static ThemeData darkTheme = ThemeData(
-    brightness: Brightness.dark,
-    scaffoldBackgroundColor: Colors.black,
-    useMaterial3: true,
-
-    colorScheme: const ColorScheme.dark(
-      primary: _darkTextColor,
-      onPrimary: Colors.black,
-      surface: Colors.black,
-      onSurface: _darkTextColor,
-    ),
-
-    textTheme: const TextTheme(
-      bodyLarge: TextStyle(
-        fontSize: 20,
-        color: _darkTextColor,
-        fontWeight: FontWeight.w400,
+      labelLarge: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: secondary,
+        letterSpacing: 0.5,
       ),
-      bodyMedium: TextStyle(
-        fontSize: 18,
-        color: _darkTextColor,
-        fontWeight: FontWeight.w400,
-      ),
-    ),
-  );
+    );
+  }
 }

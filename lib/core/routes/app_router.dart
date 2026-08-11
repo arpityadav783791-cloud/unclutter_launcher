@@ -1,0 +1,129 @@
+import 'package:go_router/go_router.dart';
+import 'package:get/get.dart';
+import '../../features/launcher/views/launcher_home_view.dart';
+import '../../features/launcher/bindings/launcher_binding.dart';
+import '../../features/apps/bindings/apps_binding.dart';
+import '../../features/search/views/search_view.dart';
+import '../../features/search/controllers/search_controller.dart';
+import '../../features/favorites/controllers/favorites_controller.dart';
+import '../../features/favorites/services/favorites_service.dart';
+import '../../features/productivity/controllers/productivity_controller.dart';
+import '../../features/apps/services/app_config_service.dart';
+import '../../features/mindful_delay/services/mindful_delay_service.dart';
+import '../../features/mindful_delay/controllers/mindful_delay_controller.dart';
+import '../../features/screen_time/services/usage_stats_service.dart';
+import '../../features/screen_time/controllers/screen_time_controller.dart';
+import '../../features/screen_time/views/screen_time_view.dart';
+import '../../features/daily_limits/services/daily_limit_service.dart';
+import '../../features/daily_limits/controllers/daily_limit_controller.dart';
+import '../../features/focus_mode/services/focus_mode_service.dart';
+import '../../features/focus_mode/controllers/focus_mode_controller.dart';
+import '../../features/scheduled_block/services/schedule_service.dart';
+import '../../features/scheduled_block/controllers/schedule_controller.dart';
+import '../../features/settings/services/settings_service.dart';
+import '../../features/settings/controllers/settings_controller.dart';
+import '../../features/settings/views/settings_view.dart';
+import 'app_routes.dart';
+
+class AppRouter {
+  static final GoRouter router = GoRouter(
+    initialLocation: AppRoutes.launcher,
+    routes: [
+      GoRoute(
+        path: AppRoutes.launcher,
+        name: 'launcher',
+        builder: (context, state) {
+          _ensureCoreBindings();
+          return const LauncherHomeView();
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.search,
+        name: 'search',
+        builder: (context, state) {
+          if (!Get.isRegistered<AppSearchController>()) {
+            Get.put(AppSearchController());
+          }
+          return const SearchView();
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.screenTime,
+        name: 'screenTime',
+        builder: (context, state) {
+          if (!Get.isRegistered<UsageStatsService>()) {
+            Get.put(UsageStatsService(), permanent: true);
+          }
+          if (!Get.isRegistered<ScreenTimeController>()) {
+            Get.put(ScreenTimeController());
+          }
+          return const ScreenTimeView();
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        name: 'settings',
+        builder: (context, state) {
+          if (!Get.isRegistered<SettingsService>()) {
+            Get.put(SettingsService(), permanent: true);
+          }
+          if (!Get.isRegistered<SettingsController>()) {
+            Get.put(SettingsController());
+          }
+          return const SettingsView();
+        },
+      ),
+    ],
+  );
+
+  static void _ensureCoreBindings() {
+    LauncherBinding().dependencies();
+    AppsBinding().dependencies();
+
+    if (!Get.isRegistered<AppConfigService>()) {
+      Get.put(AppConfigService(), permanent: true);
+    }
+    if (!Get.isRegistered<FavoritesService>()) {
+      Get.put(FavoritesService(), permanent: true);
+    }
+    if (!Get.isRegistered<FavoritesController>()) {
+      Get.put(FavoritesController());
+    }
+    if (!Get.isRegistered<MindfulDelayService>()) {
+      Get.put(MindfulDelayService(), permanent: true);
+    }
+    if (!Get.isRegistered<MindfulDelayController>()) {
+      Get.put(MindfulDelayController(), permanent: true);
+    }
+    if (!Get.isRegistered<UsageStatsService>()) {
+      Get.put(UsageStatsService(), permanent: true);
+    }
+    if (!Get.isRegistered<DailyLimitService>()) {
+      Get.put(DailyLimitService(), permanent: true);
+    }
+    if (!Get.isRegistered<DailyLimitController>()) {
+      Get.put(DailyLimitController(), permanent: true);
+    }
+    if (!Get.isRegistered<FocusModeService>()) {
+      Get.put(FocusModeService(), permanent: true);
+    }
+    if (!Get.isRegistered<FocusModeController>()) {
+      Get.put(FocusModeController(), permanent: true);
+    }
+    if (!Get.isRegistered<ScheduleService>()) {
+      Get.put(ScheduleService(), permanent: true);
+    }
+    if (!Get.isRegistered<ScheduleController>()) {
+      Get.put(ScheduleController(), permanent: true);
+    }
+    if (!Get.isRegistered<SettingsService>()) {
+      Get.put(SettingsService(), permanent: true);
+    }
+    if (!Get.isRegistered<SettingsController>()) {
+      Get.put(SettingsController(), permanent: true);
+    }
+    if (!Get.isRegistered<ProductivityController>()) {
+      Get.put(ProductivityController(), permanent: true);
+    }
+  }
+}
