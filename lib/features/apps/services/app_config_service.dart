@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import '../../../core/services/storage_service.dart';
 import '../models/app_config.dart';
+import '../models/app_info.dart';
+import 'distraction_detector.dart';
 
 class AppConfigService extends GetxService {
   static const String _key = 'app_configs';
@@ -80,15 +82,22 @@ class AppConfigService extends GetxService {
         .toList();
   }
 
-  Future<void> setDistraction(String packageName, bool isDistraction) async {
+  Future<void> setDistraction(
+    String packageName,
+    bool isDistraction, {
+    bool isUserAction = true,
+  }) async {
     final current = getConfig(packageName);
-    _cache[packageName] = current.copyWith(isDistraction: isDistraction);
+    _cache[packageName] = current.copyWith(
+      isDistraction: isDistraction,
+      isUserConfigured: isUserAction ? true : current.isUserConfigured,
+    );
     await _save();
   }
 
   Future<void> toggleDistraction(String packageName) async {
     final current = getConfig(packageName);
-    await setDistraction(packageName, !current.isDistraction);
+    await setDistraction(packageName, !current.isDistraction, isUserAction: true);
   }
 
   bool isDistraction(String packageName) {
@@ -100,5 +109,37 @@ class AppConfigService extends GetxService {
         .where((c) => c.isDistraction)
         .map((c) => c.packageName)
         .toList();
+  }
+
+  /// Automatically classifies newly discovered applications into the distraction
+  /// category if they belong to social media, video/entertainment, or games,
+  /// unless explicitly overridden by the user.
+  Future<List<String>> autoDetectDistractions(List<AppInfo> apps) async {
+    final newlyDetected = <String>[];
+    bool hasChanges = false;
+
+    for (final app in apps) {
+      final current = getConfig(app.packageName);
+      // Only auto-configure if user hasn't customized this app
+      if (!current.isUserConfigured) {
+        final isDistractionApp = DistractionDetector.isDistraction(app);
+        if (current.isDistraction != isDistractionApp) {
+          _cache[app.packageName] = current.copyWith(
+            isDistraction: isDistractionApp,
+            isUserConfigured: false,
+          );
+          hasChanges = true;
+          if (isDistractionApp) {
+            newlyDetected.add(app.packageName);
+          }
+        }
+      }
+    }
+
+    if (hasChanges) {
+      await _save();
+    }
+
+    return newlyDetected;
   }
 }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/minimal_text.dart';
-import '../controllers/daily_limit_controller.dart';
 
 class LimitReachedView extends StatelessWidget {
   final String appName;

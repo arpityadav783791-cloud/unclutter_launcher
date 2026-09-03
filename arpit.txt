@@ -1,0 +1,687 @@
+====================================================================================================
+                              OLAUNCHER DEEP TECHNICAL & ARCHITECTURAL AUDIT
+====================================================================================================
+Audit Generated: September 04, 2026
+Target Application: Olauncher (Minimal AF Launcher)
+Target Repository: d:\flutter journey\major projects\Olauncher
+Target File: arpit.txt
+====================================================================================================
+
+TABLE OF CONTENTS
+----------------------------------------------------------------------------------------------------
+ 1. EXECUTIVE SUMMARY & APPLICATION METADATA
+ 2. GIT REPOSITORY & RELEASE CHRONOLOGY
+ 3. BUILD SYSTEM, TOOLCHAIN & DEPENDENCY GRAPH
+ 4. ANDROID MANIFEST, PERMISSIONS & SYSTEM INTEGRATIONS
+ 5. APPLICATION ARCHITECTURE & DESIGN PATTERNS
+ 6. NAVIGATION GRAPH & UI HIERARCHY
+ 7. DATA PERSISTENCE & PREFERENCES SPECIFICATION (Prefs.kt)
+ 8. DETAILED CORE SUBSYSTEMS AUDIT
+    8.1. HOME SCREEN SUBSYSTEM (HomeFragment & Gestures)
+    8.2. APP DRAWER SUBSYSTEM (AppDrawerFragment, Adapter & Search Engine)
+    8.3. SETTINGS SUBSYSTEM (SettingsFragment & Customizations)
+    8.4. USAGE STATS & DIGITAL WELLBEING ENGINE (EventLogWrapper & Guardian)
+    8.5. DAILY WALLPAPER & WORKMANAGER SUBSYSTEM (WallpaperWorker & Scaler)
+    8.6. E-INK HARDWARE DETECTION & SPECIALIZED ENGINE
+    8.7. PINNED SHORTCUTS & PWA SUPPORT (ShortcutIdentity)
+    8.8. ANDROID 15+ PRIVATE SPACE SUBSYSTEM
+    8.9. ACCESSIBILITY SERVICE & DEVICE ADMIN (Lock Screen Engines)
+    8.10. ENGAGEMENT FUNNEL, EASTER EGGS & DIALOG LIFECYCLES
+ 9. RESOURCE ASSETS, STYLES, LOCALIZATION & THEME ENGINE
+10. TESTING SUITE & VERIFICATION
+11. BUGS, ANOMALIES, TECHNICAL DEBT & VULNERABILITIES AUDIT
+12. COMPLETE WORKSPACE FILE MANIFEST & LINE COUNT AUDIT
+
+====================================================================================================
+1. EXECUTIVE SUMMARY & APPLICATION METADATA
+====================================================================================================
+- Application Name: Olauncher
+- Tagline: "Minimal AF Launcher" (AF officially stands for "Ad-Free")
+- Application ID / Package Name: app.olauncher (Debug variant: app.olauncher.debug)
+- Version Name: v6.9.1
+- Version Code: 112
+- Minimum SDK: 24 (Android 7.0 Nougat)
+- Target SDK: 36 (Android 16 / Vanilla Ice Cream + future preview target)
+- Compile SDK: 36
+- Java Target / Compatibility: Java 17
+- Kotlin Version: 2.1.20
+- Primary Author / Maintainer: Tanuj M (@tanujnotes)
+- License: GNU General Public License v3.0 (GPLv3)
+- Ecosystem & Sister Applications:
+  * Pro Launcher (app.prolauncher - paid edition with widgets, weather, fonts, folders)
+  * Note to Self (com.makenotetoself - E2E encrypted chat-style notes app)
+  * Pentastic (app.pentastic - minimal todo lists)
+- Core Philosophy:
+  * Extreme digital minimalism (zero icons, plain typography, distraction-free)
+  * Strict user privacy: Zero third-party telemetry, zero trackers, zero advertisements, 100% on-device processing
+  * Lightweight footprint: Small APK, instant startup, low memory consumption
+
+====================================================================================================
+2. GIT REPOSITORY & RELEASE CHRONOLOGY
+====================================================================================================
+- Total Commit Count: 1,007+ commits
+- Remote Origin: https://github.com/tanujnotes/Olauncher.git
+- Default Active Branch: master
+- Initial Commit: 19f48b1 (Fri Jul 10 15:39:59 2020 +0530)
+  "First commit. Added intent-filters in manifest required for laucher app."
+- Recent Commit History Highlights:
+  * 1d438f8 - App version bumped to 112 (v6.9.1)
+  * a9da9d4 - Improve e-ink detection and skip animations on e-ink displays
+  * 952d9e9 - Apply pending text size change when leaving settings
+  * 47f5546 - App version bumped to 111 (v6.8.30)
+  * 4c210da - Option for bold font
+  * 9e26070 - Footer cleanup
+  * b406265 - Added missing translations to all languages
+  * fc5b37f - Fix false e-ink detection on adaptive refresh rate displays (#724)
+  * fd062e2 - Added korean translation
+  * 2b117ed - targetSdkVersion 36
+  * cd69e7d - Improve PWA shortcut handling
+  * 7e69731 - Fixed: app drawer not closing when animation is disabled #713
+  * 33ea31e - Made home text focusable for dpad support
+  * d7c36f0 - Fixed: Auto-launch not working with certain keyboards (SwiftKey)
+  * 27b9c69 - Home button for recents temporarily disabled
+- Top Contributors:
+  * Tanuj / Tanuj M (927+ commits)
+  * Omer I.S., Esther Cynthia, J-cart, Caballero Arepa, Joseph, George Sanger, Tamas Balog,
+    d3vv3, Izzy, Sreejith B Naick, Egehan Karapınar, and open-source community contributors.
+
+====================================================================================================
+3. BUILD SYSTEM, TOOLCHAIN & DEPENDENCY GRAPH
+====================================================================================================
+- Gradle Distribution: Gradle 8.11.1 (via gradle/wrapper/gradle-wrapper.properties)
+- Android Gradle Plugin (AGP): 8.9.1 (via gradle/libs.versions.toml)
+- JVM Daemon Configuration: org.gradle.jvmargs=-Xmx4608m
+- AndroidX Features Enabled:
+  * android.useAndroidX=true
+  * android.enableJetifier=true
+  * android.defaults.buildfeatures.buildconfig=true
+  * android.nonTransitiveRClass=false
+  * android.nonFinalResIds=false
+  * android.suppressUnsupportedCompileSdk=34
+- Build Features:
+  * viewBinding = true
+  * buildConfig = true
+- Build Types:
+  * Release:
+    - debuggable = false
+    - minifyEnabled = true
+    - Proguard configuration: proguard-android-optimize.txt + proguard-rules.pro
+  * Debug:
+    - debuggable = true
+    - minifyEnabled = false
+    - applicationIdSuffix = ".debug"
+    - Proguard configuration: proguard-android-optimize.txt + proguard-rules.pro
+- Dependency Version Catalog (gradle/libs.versions.toml):
+  * androidx.appcompat:appcompat:1.7.0
+  * androidx.core:core-ktx:1.16.0
+  * com.android.tools.build:gradle:8.9.1
+  * org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20
+  * org.jetbrains.kotlin:kotlin-stdlib:2.1.20
+  * androidx.lifecycle:lifecycle-extensions:2.2.0
+  * androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.0
+  * com.google.android.material:material:1.12.0
+  * androidx.navigation:navigation-fragment-ktx:2.9.0
+  * androidx.recyclerview:recyclerview:1.4.0
+  * androidx.work:work-runtime-ktx:2.10.1
+  * junit:junit:4.13.2
+
+====================================================================================================
+4. ANDROID MANIFEST, PERMISSIONS & SYSTEM INTEGRATIONS
+====================================================================================================
+Manifest File: app/src/main/AndroidManifest.xml
+
+4.1. DECLARED PERMISSIONS:
+----------------------------------------------------------------------------------------------------
+1) android.permission.SET_WALLPAPER
+   - Purpose: Set wallpaper programmatically for daily auto-wallpaper and plain black/white themes.
+2) android.permission.EXPAND_STATUS_BAR
+   - Purpose: Allows the launcher to programmatically expand notifications drawer on swipe-down gesture.
+3) android.permission.QUERY_ALL_PACKAGES (tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission")
+   - Purpose: Fundamental launcher requirement to detect, enumerate, and launch all installed applications on the device.
+4) android.permission.REQUEST_DELETE_PACKAGES
+   - Purpose: Allows requesting standard system app uninstall prompts directly from long-press actions in app drawer.
+5) android.permission.INTERNET
+   - Purpose: Exclusively used for querying Tanuj's GitHub Gist JSON and downloading Unsplash wallpaper bitmaps.
+6) com.android.alarm.permission.SET_ALARM
+   - Purpose: Fallback mechanism to open the device default alarm/clock app when tapping the clock.
+7) android.permission.PACKAGE_USAGE_STATS (tools:ignore="ProtectedPermissions")
+   - Purpose: Required to calculate daily device screen time on home screen without third-party services.
+8) android.permission.ACCESS_HIDDEN_PROFILES
+   - Purpose: Android 15 (Vanilla Ice Cream) API permission to discover and manage Private Space apps.
+
+4.2. DECLARED COMPONENTS:
+----------------------------------------------------------------------------------------------------
+1) Activity: app.olauncher.MainActivity
+   - Exported: true
+   - LaunchMode: singleTask
+   - ConfigChanges: uiMode
+   - ExcludeFromRecents: true
+   - TaskAffinity: ""
+   - WindowSoftInputMode: stateAlwaysHidden
+   - Intent Filters:
+     * ACTION_MAIN + CATEGORY_HOME + CATEGORY_DEFAULT + CATEGORY_LAUNCHER (Designates Olauncher as a Home launcher)
+
+2) Activity: app.olauncher.helper.PinItemActivity
+   - Exported: true
+   - Theme: @android:style/Theme.Translucent.NoTitleBar
+   - Intent Filters:
+     * android.content.pm.action.CONFIRM_PIN_SHORTCUT
+     * android.content.pm.action.CONFIRM_PIN_APPWIDGET
+   - Handling: Confirms shortcut pinning from third-party apps (browsers, progressive web apps).
+     Displays toast "Widgets are not supported" if widget pinning is requested.
+
+3) Activity: app.olauncher.helper.FakeHomeActivity
+   - Exported: false, Enabled: false
+   - LaunchMode: singleTask
+   - WindowSoftInputMode: stateHidden
+   - Intent Filters:
+     * ACTION_MAIN + CATEGORY_HOME + CATEGORY_DEFAULT + CATEGORY_LAUNCHER
+   - Architectural Trick: Temporarily enabled and queried to force Android system to invalidate its cached
+     default launcher and display the system "Select a Home app" picker dialog.
+
+4) Receiver: app.olauncher.listener.DeviceAdmin
+   - Exported: false
+   - Permission: android.permission.BIND_DEVICE_ADMIN
+   - Metadata: android.app.device_admin -> @xml/policies (force-lock policy)
+   - Intent Filter: android.app.action.DEVICE_ADMIN_ENABLED
+   - Purpose: Used for locking screen on Android Oreo (API < 28) before Accessibility API global actions.
+
+5) Service: app.olauncher.helper.MyAccessibilityService
+   - Exported: false
+   - Permission: android.permission.BIND_ACCESSIBILITY_SERVICE
+   - Process: ":serviceProcess" (Runs in an isolated separate Android OS process)
+   - Metadata: @xml/accessibility_service_config
+   - Purpose: Intercepts clicks to trigger performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) on Android Pie+ (API >= 28).
+
+====================================================================================================
+5. APPLICATION ARCHITECTURE & DESIGN PATTERNS
+====================================================================================================
+- Architecture Pattern: MVVM (Model-View-ViewModel) + Single Activity Multi-Fragment Navigation
+- Main Architecture Components:
+  1) MainActivity: Hosts NavHostFragment, global message dialog overlays, orientation management,
+     and broadcast receivers for profile changes and shortcut lifecycle updates.
+  2) MainViewModel: Central state holder inheriting from AndroidViewModel. Exposes LiveData and
+     SingleLiveEvent streams for app list updates, home screen reloads, alignment events, dialog
+     triggers, and Private Space toggles.
+  3) BaseFragment: Abstract base class providing custom onCreateAnimator overrides to cancel fragment
+     animations when running on E-Ink devices or when system animations are turned off.
+  4) HomeFragment: Primary interface rendering time, date, battery status, screen time, and 0-8 home apps.
+  5) AppDrawerFragment: Recycler-based list containing searchable apps, private space section, and
+     filtering mechanism.
+  6) SettingsFragment: Detailed preference control panel with scrollable settings list.
+
+- Communication Channels:
+  * SingleLiveEvent<T>: Specialized LiveData implementation using AtomicBoolean(false) to ensure events
+    (dialog triggers, home resets) are consumed exactly once by only one active observer.
+  * MutableLiveData<T>: State holders for asynchronous background data (apps list, alignment, screen time).
+
+====================================================================================================
+6. NAVIGATION GRAPH & UI HIERARCHY
+====================================================================================================
+Navigation Graph: app/src/main/res/navigation/nav_graph.xml
+- Start Destination: @id/mainFragment (HomeFragment)
+- Navigation Actions & Transitions:
+  1) action_mainFragment_to_appListFragment:
+     * Destination: appListFragment
+     * Enter Anim: @anim/fade_enter
+     * Exit Anim: @anim/slide_out_top
+     * Pop Enter Anim: @anim/slide_in_top
+     * Pop Exit Anim: @anim/fade_exit
+  2) action_mainFragment_to_settingsFragment:
+     * Destination: settingsFragment
+     * Enter / Exit / Pop Enter / Pop Exit: @anim/fade_enter & @anim/fade_exit
+  3) action_appListFragment_to_settingsFragment2:
+     * Destination: settingsFragment
+     * PopUpTo: @id/appListFragment (inclusive: true)
+  4) action_settingsFragment_to_appListFragment:
+     * Destination: appListFragment
+
+- Responsive Layouts:
+  * Standard portrait layouts in res/layout/
+  * Dedicated landscape layouts in res/layout-land/:
+    - fragment_home.xml: Adjusts margins (64dp horizontal margin vs 10dp in portrait)
+    - fragment_app_drawer.xml: Adapts vertical spacing
+    - fragment_settings.xml: Adapts side paddings for landscape orientations
+
+====================================================================================================
+7. DATA PERSISTENCE & PREFERENCES SPECIFICATION (Prefs.kt)
+====================================================================================================
+SharedPreferences File Name: "app.olauncher" (MODE_PRIVATE = 0)
+Below is the exhaustive catalog of every persisted preference key, type, default value, and purpose:
+
+Key String Constant            | Type        | Default Value    | Description / Purpose
+-------------------------------+-------------+------------------+-----------------------------------
+FIRST_OPEN                     | Boolean     | true             | Tracks first app launch
+FIRST_OPEN_TIME                | Long        | 0L               | Epoch millisecond timestamp of install/first open
+FIRST_SETTINGS_OPEN            | Boolean     | true             | Tracks first entrance into settings
+FIRST_HIDE                     | Boolean     | true             | Tracks if user has hidden an app for the first time
+USER_STATE                     | String      | "START"          | Engagement state ("START", "WALLPAPER", "REVIEW", "RATE", "SHARE")
+LOCK_MODE                      | Boolean     | false            | Double-tap to lock enabled
+HOME_APPS_NUM                  | Int         | 4                | Number of apps on home screen (0 to 8)
+AUTO_SHOW_KEYBOARD             | Boolean     | true             | Auto open keyboard when entering app drawer
+KEYBOARD_MESSAGE               | Boolean     | false            | Confirms whether keyboard retention dialog was shown
+DAILY_WALLPAPER                | Boolean     | false            | Daily wallpaper background worker active
+DAILY_WALLPAPER_URL            | String      | ""               | Last downloaded wallpaper URL
+HOME_ALIGNMENT                 | Int         | Gravity.START    | Horizontal alignment: START (3), CENTER (1), END (5)
+HOME_BOTTOM_ALIGNMENT          | Boolean     | false            | Vertical alignment: true=Bottom, false=Center
+APP_LABEL_ALIGNMENT            | Int         | Gravity.START    | Drawer label alignment
+STATUS_BAR                     | Boolean     | false            | Show/hide system status bar on top
+DATE_TIME_VISIBILITY           | Int         | 1 (DateTime.ON)  | 0=OFF, 1=ON, 2=DATE_ONLY
+SWIPE_LEFT_ENABLED             | Boolean     | true             | Enable gesture swipe left
+SWIPE_RIGHT_ENABLED            | Boolean     | true             | Enable gesture swipe right
+APP_THEME                      | Int         | 2 (NIGHT_YES)    | Night mode: MODE_NIGHT_YES, MODE_NIGHT_NO, MODE_NIGHT_FOLLOW_SYSTEM
+TEXT_SIZE_SCALE                | Float       | 1.0f             | Font scaling factor (0.5f to 1.5f on phone, 2.0f on tablet)
+BOLD_FONT                      | Boolean     | false            | Bold font overlay toggle
+PRO_MESSAGE_SHOWN              | Boolean     | false            | Tracks if Pro Launcher promotion dialog was shown
+HIDE_SET_DEFAULT_LAUNCHER      | Boolean     | false            | Dismiss "Set as default launcher" prompt on home
+SCREEN_TIME_LAST_UPDATED       | Long        | 0L               | Timestamp of last screen time recalculation
+LAUNCHER_RECREATE_TIMESTAMP    | Long        | 0L               | Periodic 4-hour activity recreate & cache flush timestamp
+SHOWN_ON_DAY_OF_YEAR           | Int         | 0                | Tracks New Year wishes display (Day 1 & Day 32)
+HIDDEN_APPS                    | Set<String> | emptySet()       | Set of hidden package identifiers: "package|userHandle"
+HIDDEN_APPS_UPDATED            | Boolean     | false            | Migration flag from legacy package string to "package|user"
+SHOW_HINT_COUNTER              | Int         | 1                | Launcher open counter to trigger rate prompt
+ABOUT_CLICKED                  | Boolean     | false            | Indicates if user visited About page (clears hint icon)
+RATE_CLICKED                   | Boolean     | false            | Indicates if user clicked rate
+WALLPAPER_MSG_SHOWN            | Boolean     | false            | Tracks if wallpaper suggestion dialog was shown
+SHARE_SHOWN_TIME               | Long        | 0L               | Timestamp of share dialog presentation
+SWIPE_DOWN_ACTION              | Int         | 2 (NOTIFICATIONS)| 1=SEARCH, 2=NOTIFICATIONS
+APP_NAME_1 .. 8                | String      | ""               | Display label for home slot 1 through 8
+APP_PACKAGE_1 .. 8             | String      | ""               | Package name for home slot 1 through 8
+APP_ACTIVITY_CLASS_NAME_1 .. 8 | String      | ""               | Explicit Activity class name for slot 1 through 8
+APP_USER_1 .. 8                | String      | ""               | UserHandle string representation for slot 1 through 8
+IS_SHORTCUT_1 .. 8             | Boolean     | false            | Whether home slot 1 through 8 is a pinned shortcut
+SHORTCUT_ID_1 .. 8             | String      | ""               | Shortcut ID string for pinned shortcut slot 1 through 8
+APP_NAME_SWIPE_LEFT            | String      | "Camera"         | Label for swipe left action
+APP_NAME_SWIPE_RIGHT           | String      | "Phone"          | Label for swipe right action
+APP_PACKAGE_SWIPE_LEFT         | String      | ""               | Package for swipe left action
+APP_PACKAGE_SWIPE_RIGHT        | String      | ""               | Package for swipe right action
+APP_ACTIVITY_CLASS_NAME_SWIPE_L| String      | ""               | Activity class name for swipe left
+APP_ACTIVITY_CLASS_NAME_SWIPE_R| String      | ""               | Activity class name for swipe right
+APP_USER_SWIPE_LEFT / RIGHT    | String      | ""               | UserHandle string for swipe left / right
+IS_SHORTCUT_SWIPE_LEFT / RIGHT | Boolean     | false            | Shortcut flag for swipe left / right
+SHORTCUT_ID_SWIPE_LEFT / RIGHT | String      | ""               | Shortcut ID for swipe left / right
+CLOCK_APP_PACKAGE / USER/ CLASS| String      | ""               | Explicit clock application package/user/class
+CALENDAR_APP_PACKAGE/USER/CLASS| String      | ""               | Explicit calendar application package/user/class
+SCREEN_TIME_APP_PACKAGE/USER/CL| String      | ""               | Custom screen time app package/user/class
+[App Package Name / ShortcutId]| String      | Custom Rename    | Dynamically keyed by package or shortcut identity
+
+====================================================================================================
+8. DETAILED CORE SUBSYSTEMS AUDIT
+====================================================================================================
+
+8.1. HOME SCREEN SUBSYSTEM (HomeFragment.kt, OnSwipeTouchListener.kt, ViewSwipeTouchListener.kt)
+----------------------------------------------------------------------------------------------------
+- UI Layout: fragment_home.xml
+- Functional Capabilities:
+  1) Home App Slots: Supports between 0 and 8 user-defined apps or pinned shortcuts.
+     - Tapping launches the target app or shortcut via ViewModel.
+     - Long-pressing opens the App Drawer filtered for slot assignment with rename option.
+     - D-pad accessibility: Each TextView is explicitly android:focusable="true".
+  2) Time & Date Display:
+     - Uses TextClock for current time (format: "h:mm").
+     - Date format: "EEE, d MMM" (Locale formatted).
+     - When status bar is hidden, the battery level percentage is appended to the date string:
+       e.g., "Thu, 4 Sep, 85%".
+     - Long-pressing Clock opens app picker to set a custom Clock app; tapping opens current/system clock.
+     - Long-pressing Date opens app picker to set a custom Calendar app; tapping opens current/system calendar.
+  3) Screen Time Display:
+     - Queryable on Android 10+ (API >= 29) if PACKAGE_USAGE_STATS permission is granted.
+     - Formatted as "Xh Ym", "Xm", or "<1m".
+     - Tapping opens Digital Wellbeing (supports Google Digital Wellbeing and Samsung Forest Wellbeing)
+       or custom assigned app. Long-pressing allows assigning a custom screen time app.
+  4) Alignment Engine:
+     - Horizontal Gravity: START (Left), CENTER, or END (Right).
+     - Vertical Gravity: CENTER_VERTICAL (default) or BOTTOM (HomeBottomAlignment).
+  5) Gesture Architecture:
+     - OnSwipeTouchListener attached to root FrameLayout.
+     - ViewSwipeTouchListener attached to each of the 8 home app TextViews.
+     - Velocity and swipe thresholds: SWIPE_THRESHOLD = 100px, SWIPE_VELOCITY_THRESHOLD = 100px/s.
+     - Gestures Supported:
+       * Swipe Up -> Opens App Drawer (Constants.FLAG_LAUNCH_APP).
+       * Swipe Down -> Notifications Drawer (via StatusBarManager reflection) or Web Search.
+       * Swipe Left -> Configurable application (defaults to MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).
+       * Swipe Right -> Configurable application (defaults to Intent.ACTION_DIAL).
+       * Double Tap -> Screen lock (via Accessibility Service or DeviceAdmin).
+       * Long Press -> Opens SettingsFragment.
+       * Single Tap -> Invokes periodic message checker (checkForMessages).
+
+8.2. APP DRAWER SUBSYSTEM (AppDrawerFragment.kt, AppDrawerAdapter.kt)
+----------------------------------------------------------------------------------------------------
+- Recycler Architecture:
+  * Uses ListAdapter with DiffUtil.ItemCallback<AppModel>.
+  * Multiple ViewTypes: VIEW_TYPE_APP (0) and VIEW_TYPE_PRIVATE_HEADER (1).
+  * Fast scrolling with overscroll exit: dragging down while at top (overscroll < -10) exits back to home.
+- Search Engine:
+  * Diacritics and Accents normalization via Normalizer.normalize(Form.NFD) and regex matching
+    p{InCombiningDiacriticalMarks}+.
+  * Separator filtering: removes punctuation, dashes, spaces, underscores, dots, commas, backticks.
+  * Auto-Launch Logic: Automatically executes launch when query results narrow down to exactly 1 app.
+    - Safety guard: Disabled if query starts with a space (" ").
+    - Safety guard: Disabled if query starts with DuckDuckGo bang ("!").
+    - Safety guard: Disabled if input method is currently composing in CJK keyboards (Chinese, Japanese,
+      Korean via BaseInputConnection composing spans and InputMethodSubtype inspection).
+  * DuckDuckGo Bang Search: If query starts with "!", pressing submit immediately launches browser at
+    https://duck.co/?q={query}.
+  * Web Search Fallback: If 0 app results match query, pressing Enter opens device web search with query text.
+- Long Press Context Menu:
+  * Reveals actions inline on the item:
+    1) Uninstall: Requests package deletion via Context.uninstall(packageName). (Disabled for system apps).
+    2) Rename: Opens inline AppCompatEditText to save custom alias in SharedPreferences.
+    3) Hide: Hides application from launcher list and persists in hiddenApps set.
+    4) Info: Opens system App Details screen (android.settings.APPLICATION_DETAILS_SETTINGS).
+    5) Close: Dismisses menu.
+- Visual Badges:
+  * Newly installed apps (firstInstallTime within last 1 hour) display a star symbol: " ✦".
+  * Apps running under non-primary profiles (Work profile, Secondary user) display a circular indicator icon.
+
+8.3. SETTINGS SUBSYSTEM (SettingsFragment.kt, fragment_settings.xml)
+----------------------------------------------------------------------------------------------------
+- Highly customizable preferences dashboard:
+  * Home screen apps count picker: 0 to 8 apps.
+  * Alignment picker: Left, Center, Right, and Bottom toggle.
+  * Date/Time visibility: On, Date Only, Off.
+  * Theme Mode: Light (MODE_NIGHT_NO), Dark (MODE_NIGHT_YES), System Default (MODE_NIGHT_FOLLOW_SYSTEM).
+  * Text Size Slider: Preview scale delta +/-0.1 increments. Scaled between 0.5f and 1.5f (up to 2.0f on tablets).
+    Changes are applied cleanly upon exiting settings to prevent unnecessary activity recreations.
+  * Bold Font Toggle: Applies theme overlay R.style.BoldFontOverlay dynamically altering font family to sans-serif.
+  * Status Bar Toggle: Window insets controller show/hide status bars or immersive fullscreen flags.
+  * Daily Wallpaper: Toggles background WorkManager periodic task.
+  * Swipe Down Gesture: Notifications panel vs Web search.
+  * Swipe Left / Swipe Right: Tap to change app, long-press to enable/disable gesture entirely.
+  * Hidden Apps Screen: Tapping launcher title or Hidden Apps preference shows hidden apps list.
+  * Lock screen setup: Step-by-step guidance for accessibility service with troubleshooting link.
+  * Cross-promotions & Community: Links to Pro Launcher, Note to Self, Pentastic, BuyMeACoffee, PayPal.
+
+8.4. USAGE STATS & DIGITAL WELLBEING ENGINE (EventLogWrapper.kt, UnmatchedCloseEventGuardian.kt)
+----------------------------------------------------------------------------------------------------
+- Problem Solved: Android UsageStatsManager often drops close events, swaps events out of chronological
+  order, or fails to report background transitions accurately across reboots and multi-window scenarios.
+- Solution: Custom implementation ported from usageDirect library.
+- Processing Pipeline:
+  1) Queries ActivityManager.runningAppProcesses to capture currently visible and foreground packages.
+  2) Queries UsageStatsManager.queryEvents between midnight (or start) and now.
+  3) Handles Android Event Types:
+     - ACTIVITY_RESUMED / 4 (CONTINUE_PREVIOUS_DAY) -> Records open timestamp in moveToForegroundMap.
+     - ACTIVITY_PAUSED / ACTIVITY_STOPPED / 3 (END_OF_DAY) -> Matches open event and records foreground span.
+     - DEVICE_STARTUP -> Clears pending open events, resetting query start.
+     - DEVICE_SHUTDOWN -> Closes all active open events at shutdown timestamp.
+  4) UnmatchedCloseEventGuardian:
+     - If an unmatched close event is detected, Guardian scans backward up to 24 hours (SCAN_INTERVAL)
+       to verify if the app was previously opened before the current query period began.
+  5) Interval Merging: mergeOverlappingIntervals merges overlapping or concurrent component timestamps
+     from the same package to avoid double-counting active time.
+
+8.5. DAILY WALLPAPER & WORKMANAGER SUBSYSTEM (WallpaperWorker.kt, Utils.kt)
+----------------------------------------------------------------------------------------------------
+- Scheduled using Android Jetpack WorkManager:
+  * Unique Periodic Work: Constants.WALLPAPER_WORKER_NAME
+  * Repeat Interval: 4 Hours
+  * Backoff Criteria: Linear, 1 Hour
+  * Constraints: Requires NetworkType.CONNECTED
+- Remote Wallpapers Source:
+  * Curated JSON repository maintained by Tanuj:
+    https://gist.githubusercontent.com/tanujnotes/85e2d0343ace71e76615ac346fbff82b/raw
+  * Indexing algorithm:
+    - If user installed < 10 days ago: uses install-relative index "0_{daysSinceInstall}"
+    - If user installed >= 10 days: uses calendar month and day "{month}_{day}" (e.g. "9_4")
+  * Separate keys for light and dark wallpapers.
+  * Fallbacks: Curated Unsplash photos (Constants.URL_DEFAULT_DARK_WALLPAPER, URL_DEFAULT_LIGHT_WALLPAPER).
+- Image Processing & Aspect Ratio Scaling:
+  * Downloads raw stream via HttpURLConnection.
+  * Queries display real dimensions using WindowManager.defaultDisplay.getRealSize(point).
+  * Calculates widthScale and heightScale to take the max scale factor.
+  * Centers and scales bitmap via Matrix transformation (preScale + postTranslate) on a Canvas.
+  * Sets bitmap on WallpaperManager.FLAG_SYSTEM and WallpaperManager.FLAG_LOCK simultaneously.
+  * Immediately recycles source and scaled bitmaps to prevent OOM memory leaks.
+
+8.6. E-INK HARDWARE DETECTION & SPECIALIZED ENGINE (BaseFragment.kt, Extensions.kt, Utils.kt)
+----------------------------------------------------------------------------------------------------
+- Comprehensive E-Ink Detection Pipeline:
+  1) Display Refresh Rate: Checks if max supported display refresh rate is <= 30Hz
+     (windowManager.defaultDisplay.supportedModes.maxOf { it.refreshRate } <= 30f).
+     * Note: Uses max supported refresh rate to prevent false positives on modern LTPO/adaptive displays
+       that drop down to 1Hz-10Hz when idling.
+  2) Onyx Boox Detection:
+     - Checks Build.MANUFACTURER == "ONYX".
+     - Attempts reflection check for Onyx proprietary SDK class: Class.forName("android.onyx.ViewUpdateHelper").
+  3) Dedicated E-Ink Brands List:
+     - Inspects Build.BRAND and Build.MANUFACTURER for:
+       "onyx", "boox", "dasung", "bigme", "boyue", "meebook", "mudita".
+  4) Hisense E-Ink Lineup Detection:
+     - Regex match for "\bA[579]\b|TOUCH|HI READER" against Build.MODEL.
+- E-Ink Specific Optimizations Applied:
+  * Forces Light Theme (AppCompatDelegate.MODE_NIGHT_NO) with pure white background.
+  * Sets plain white wallpaper on launcher setup.
+  * Cancels all Fragment entry and exit animations (ValueAnimator.ofFloat(0f, 1f).setDuration(0)).
+  * Sets RecyclerView overscroll mode to View.OVER_SCROLL_NEVER (prevents ghosting artifacts).
+  * Replaces alpha animations with instantaneous view.alpha assignments.
+
+8.7. PINNED SHORTCUTS & PWA SUPPORT (ShortcutIdentity.kt, PinItemActivity.kt)
+----------------------------------------------------------------------------------------------------
+- Android Pinned Shortcuts Integration:
+  * Queries LauncherApps.ShortcutQuery with FLAG_MATCH_PINNED.
+  * Generates collision-proof composite identity via shortcutIdentity():
+    Format: "shortcut:{pkgLen}:{pkg}{idLen}:{id}{userLen}:{user}"
+    Example: "shortcut:15:org.mozilla.fenix22:https://news.ycombinator.com13:UserHandle{0}"
+  * Supports dynamic shortcuts, PWA home screen shortcuts (Chrome, Firefox, Brave), contact shortcuts.
+  * PinItemActivity handles incoming system shortcut requests (REQUEST_TYPE_SHORTCUT) and calls pinItemRequest.accept().
+  * Deletion: Context.deletePinnedShortcut re-pins remaining shortcuts using LauncherApps.pinShortcuts.
+
+8.8. ANDROID 15+ PRIVATE SPACE SUBSYSTEM (MainViewModel.kt, AndroidManifest.xml, Utils.kt)
+----------------------------------------------------------------------------------------------------
+- Supports Android 15 (Vanilla Ice Cream / API 35+) Private Space profiles:
+  * Uses android.permission.ACCESS_HIDDEN_PROFILES.
+  * Detects profile user type: launcherApps.getLauncherUserInfo(userHandle)?.userType == "android.os.usertype.profile.PRIVATE".
+  * Profile Availability Receiver: Listens for Intent.ACTION_PROFILE_AVAILABLE and ACTION_PROFILE_UNAVAILABLE.
+  * State Tracking: Queries UserManager.isQuietModeEnabled(handle) to check locked/unlocked state.
+  * Unlocking / Locking: Invokes userManager.requestQuietModeEnabled(!currentlyLocked, handle)
+    which triggers system biometric / PIN confirmation.
+  * UI Integration: Shows a dedicated "Private space" header in app drawer. Tapping toggles lock/unlock;
+    long-pressing launches system Private Space settings.
+  * Safety: Maintains flag `isPrivateSpaceToggling` to prevent popping back to home screen while the OS
+    shows the biometric credential authentication sheet.
+
+8.9. ACCESSIBILITY SERVICE & DEVICE ADMIN (Lock Screen Engines)
+----------------------------------------------------------------------------------------------------
+- Two distinct screen locking mechanisms depending on Android API level:
+  1) Android Pie+ (API >= 28): MyAccessibilityService
+     - Isolated process: android:process=":serviceProcess".
+     - Listens for accessibility event on an invisible 1dp FrameLayout in HomeFragment with
+       contentDescription == @string/lock_layout_description.
+     - Calls performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN).
+     - Does not compromise biometric unlock (Smart Lock and fingerprint remain available).
+  2) Legacy Android (API < 28): DeviceAdmin
+     - Binds DevicePolicyManager with uses-policies <force-lock />.
+     - Calls deviceManager.lockNow().
+
+8.10. ENGAGEMENT FUNNEL, EASTER EGGS & DIALOG LIFECYCLES
+----------------------------------------------------------------------------------------------------
+- User Journey State Machine (Prefs.USER_STATE):
+  1) START: Initial state upon installation. After 10 minutes (hasBeenMinutes(10)), moves to WALLPAPER.
+  2) WALLPAPER: Prompts user to enable daily curated wallpapers.
+  3) REVIEW: If Olauncher is set as default launcher and hasBeenHours(1), shows gentle review prompt.
+  4) RATE: If default launcher and isDaySince() >= 7 and hour of day >= 16:00, prompts for 5-star review.
+  5) SHARE: If default launcher, installed >= 14 days, and share dialog hasn't been shown in 70 days,
+     prompts to share the launcher with friends/family.
+  6) PRO_MESSAGE: Prompts user about Pro Launcher when reaching end of onboarding flow.
+- Easter Eggs & Seasonal Messages:
+  * Day 1 of Year (January 1st): "Here's to a year better than any before. Happy new year!"
+  * Day 32 of Year (February 1st): "It doesn't matter how January went. You still have the rest of the year to do better than ever."
+- Automatic 4-Hour Memory Refresh:
+  * On onStart(), if hasBeenHours(4) is true, Olauncher deletes its internal cacheDir.deleteRecursively()
+    and triggers recreate() to eliminate any accumulated bitmap or view memory leaks.
+
+====================================================================================================
+9. RESOURCE ASSETS, STYLES, LOCALIZATION & THEME ENGINE
+====================================================================================================
+9.1. THEMES & ATTRIBUTES (styles.xml, values-night/styles.xml, attrs.xml)
+----------------------------------------------------------------------------------------------------
+- Theme Definitions:
+  * AppTheme (Light mode: parent Theme.AppCompat.Light.NoActionBar)
+  * AppTheme (Dark mode: parent Theme.AppCompat.NoActionBar in values-night)
+  * BoldFontOverlay (Overlay altering mainFontFamily to "sans-serif")
+- Key Custom Attributes:
+  * primaryColor, primaryInverseColor, primaryTextShadowColor
+  * primaryColorTrans50, primaryColorTrans80
+  * primaryColorInverseTrans50, primaryColorInverseTrans80, primaryColorInverseTrans90
+  * primaryShadeColor, primaryShadeDarkColor, dialogShadeColor
+  * mainFontFamily (default "sans-serif-light")
+- Transparency & Cutout Mode:
+  * shortEdges display cutout mode (extends behind notch/pinhole)
+  * windowShowWallpaper = true
+  * windowBackground = transparent
+  * statusBarColor = transparent, navigationBarColor = transparent
+  * WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS applied in MainActivity
+
+9.2. LOCALIZATION (21 Supported Locales):
+----------------------------------------------------------------------------------------------------
+- Arabic (values-ar)
+- German (values-de)
+- Spanish - Spain (values-es-rES)
+- Spanish - US (values-es-rUS)
+- French (values-fr)
+- Hebrew (values-he)
+- Croatian (values-hr)
+- Hungarian (values-hu)
+- Hindi / Indian English (values-in)
+- Italian (values-it)
+- Japanese (values-ja)
+- Korean (values-ko)
+- Dutch (values-nl)
+- Polish (values-pl)
+- Portuguese - Brazil (values-pt-rBR)
+- Russian (values-ru-rRU)
+- Swedish (values-sv)
+- Turkish (values-tr)
+- Ukrainian (values-uk)
+- Chinese (values-zh)
+- Default English (values)
+
+====================================================================================================
+10. TESTING SUITE & VERIFICATION
+====================================================================================================
+- Test Runner: androidx.test.runner.AndroidJUnitRunner
+- Test Directory: app/src/test/java/app/olauncher/data/ShortcutIdentityTest.kt
+- Unit Tests Present:
+  1) `identity is stable`: Validates that identical packages, URLs, and users produce deterministic keys.
+  2) `same shortcut id from different browsers has different identity`: Validates package names isolate shortcuts.
+  3) `field boundaries cannot collide`: Validates length prefixing prevents collisions
+     (e.g., ("ab", "c", "d") vs ("a", "bc", "d")).
+
+====================================================================================================
+11. BUGS, ANOMALIES, TECHNICAL DEBT & VULNERABILITIES AUDIT
+====================================================================================================
+During this comprehensive code audit, the following specific bugs, code smells, and technical debt
+items were uncovered:
+
+1) Bug in DeviceAdmin.kt (Lines 15-18):
+   - In onDisabled(intent: Intent?, context: Context), the toast displayed is:
+     Toast.makeText(context, context.getString(R.string.enabled), Toast.LENGTH_SHORT).show()
+   - Anomaly: It displays "Enabled" when the device admin is actually *disabled*. It should be R.string.disabled.
+
+2) Non-Existent Settings Activity in accessibility_service_config.xml (Line 10):
+   - Attribute specifies: android:settingsActivity="com.example.android.accessibility.ServiceSettingsActivity"
+   - Anomaly: This is a placeholder copied from Android sample code. Tapping "Settings" on the Accessibility
+     page in system settings will crash or fail silently because this activity does not exist in Olauncher.
+
+3) GlobalScope Coroutine Launch in Touch Listeners (OnSwipeTouchListener.kt & ViewSwipeTouchListener.kt):
+   - Uses GlobalScope.launch { delay(500); ... } for long-press handling.
+   - Anomaly: GlobalScope usage is discouraged in modern Kotlin as it breaks structured concurrency and
+     can leak coroutines beyond the view lifecycle.
+
+4) Deprecated / Commented-out "Home Button For Recents" Feature:
+   - Residual code exists across AndroidManifest, MainActivity, HomeFragment, SettingsFragment,
+     strings.xml, and MyAccessibilityService for a "Home button for recents" feature that is disabled.
+
+5) SingleLiveEvent Multiple Observers Warning:
+   - SingleLiveEvent logs a warning if multiple observers attach, but does not enforce a single observer
+     at compile time. MainViewModel exposes SingleLiveEvents that could miss events if lifecycle owners reattach.
+
+6) Target SDK 36 Bleeding Edge:
+   - Target SDK is set to 36 (Android 16), which is higher than standard stable release targets (SDK 34/35).
+   - android.suppressUnsupportedCompileSdk=34 is present in gradle.properties to bypass build tooling warnings.
+
+====================================================================================================
+12. COMPLETE WORKSPACE FILE MANIFEST & LINE COUNT AUDIT
+====================================================================================================
+Total Files in Workspace: 144 files
+Total Repository Size: ~1.05 MB (clean working tree without build artifacts)
+
+Key Source Files Breakdown:
+- Root Files:
+  * README.md (45 lines)
+  * LICENSE (GPLv3 - 674 lines)
+  * build.gradle (25 lines)
+  * settings.gradle (2 lines)
+  * gradle.properties (25 lines)
+  * gradlew (5,468 bytes) & gradlew.bat (2,260 bytes)
+  * .gitignore (19 lines)
+  * .github/funding.yml (4 lines)
+
+- App Module:
+  * app/build.gradle (69 lines)
+  * app/proguard-rules.pro (21 lines)
+  * app/.gitignore (1 line)
+
+- Kotlin Source Files (app/src/main/java/app/olauncher/):
+  * MainActivity.kt (433 lines, 17,242 bytes)
+  * MainViewModel.kt (530 lines, 22,438 bytes)
+  * data/AppModel.kt (49 lines, 1,593 bytes)
+  * data/Constants.kt (119 lines, 4,786 bytes)
+  * data/DrawerCharacterModel.kt (6 lines, 132 bytes)
+  * data/Prefs.kt (652 lines, 29,625 bytes)
+  * data/ShortcutIdentity.kt (5 lines, 220 bytes)
+  * helper/AppFilterHelper.kt (7 lines, 145 bytes)
+  * helper/AppUsageStats.kt (21 lines, 598 bytes)
+  * helper/Extensions.kt (218 lines, 8,014 bytes)
+  * helper/FakeHomeActivity.kt (12 lines, 344 bytes)
+  * helper/MyAccessibilityService.kt (45 lines, 1,499 bytes)
+  * helper/PinItemActivity.kt (52 lines, 1,735 bytes)
+  * helper/SingleLiveEvent.kt (36 lines, 952 bytes)
+  * helper/Utils.kt (684 lines, 26,615 bytes)
+  * helper/WallpaperWorker.kt (48 lines, 1,717 bytes)
+  * helper/usageStats/ComponentForegroundStat.kt (29 lines, 1,005 bytes)
+  * helper/usageStats/EventLogWrapper.kt (391 lines, 18,286 bytes)
+  * helper/usageStats/SimpleUsageStat.kt (49 lines, 1,808 bytes)
+  * helper/usageStats/UnmatchedCloseEventGuardian.kt (66 lines, 2,485 bytes)
+  * listener/DeviceAdmin.kt (19 lines, 656 bytes)
+  * listener/OnSwipeTouchListener.kt (113 lines, 3,763 bytes)
+  * listener/ViewSwipeTouchListener.kt (96 lines, 3,301 bytes)
+  * ui/AppDrawerAdapter.kt (363 lines, 14,903 bytes)
+  * ui/AppDrawerFragment.kt (383 lines, 15,802 bytes)
+  * ui/BaseFragment.kt (17 lines, 589 bytes)
+  * ui/HomeFragment.kt (735 lines, 29,022 bytes)
+  * ui/SettingsFragment.kt (704 lines, 30,229 bytes)
+
+- Unit Test Source Files:
+  * app/src/test/java/app/olauncher/data/ShortcutIdentityTest.kt (32 lines, 939 bytes)
+
+- Resource Layout Files (app/src/main/res/layout/):
+  * activity_main.xml (99 lines, 4,102 bytes)
+  * activity_fake_home.xml (311 bytes)
+  * adapter_app_drawer.xml (179 lines, 6,698 bytes)
+  * adapter_private_space_header.xml (22 lines, 722 bytes)
+  * fragment_app_drawer.xml (70 lines, 2,567 bytes)
+  * fragment_home.xml (210 lines, 7,963 bytes)
+  * fragment_settings.xml (885 lines, 53,007 bytes)
+  * layout-land/fragment_app_drawer.xml (2,651 bytes)
+  * layout-land/fragment_home.xml (7,959 bytes)
+  * layout-land/fragment_settings.xml (50,951 bytes)
+
+- Resource Configuration & Values:
+  * values/strings.xml (180 lines, 12,898 bytes)
+  * values/styles.xml (101 lines, 4,987 bytes)
+  * values-night/styles.xml (96 lines, 4,814 bytes)
+  * values/colors.xml (31 lines, 1,334 bytes)
+  * values/attrs.xml (16 lines, 749 bytes)
+  * values/dimens.xml (6 lines, 254 bytes)
+  * xml/accessibility_service_config.xml (11 lines, 588 bytes)
+  * xml/data_extraction_rules.xml (19 lines, 569 bytes)
+  * xml/backup_rules.xml (13 lines, 490 bytes)
+  * xml/locales_config.xml (11 lines, 419 bytes)
+  * xml/policies.xml (6 lines, 138 bytes)
+  * navigation/nav_graph.xml (58 lines, 2,405 bytes)
+
+====================================================================================================
+END OF AUDIT REPORT (arpit.txt)
+====================================================================================================

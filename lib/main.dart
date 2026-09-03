@@ -22,6 +22,9 @@ import 'features/timed_access/services/timed_access_service.dart';
 import 'features/timed_access/controllers/timed_access_controller.dart';
 import 'features/protected_mode/services/protected_mode_service.dart';
 import 'features/protected_mode/controllers/protected_mode_controller.dart';
+import 'core/services/permission_service.dart';
+import 'features/onboarding/services/onboarding_service.dart';
+import 'features/launcher/services/home_gesture_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +35,8 @@ void main() async {
 
   await Get.putAsync(() => StorageService().init());
   Get.put(NativeBridge());
+  Get.put(PermissionService(), permanent: true);
+  Get.put(OnboardingService(), permanent: true);
   Get.put(NativeAppService(), permanent: true);
   Get.put(AppConfigService(), permanent: true);
   Get.put(FavoritesService(), permanent: true);
@@ -50,6 +55,7 @@ void main() async {
   Get.put(ProtectedModeController(), permanent: true);
   Get.put(SettingsService(), permanent: true);
   Get.put(SettingsController(), permanent: true);
+  Get.put(HomeGestureService(), permanent: true);
 
   runApp(const MinimalLauncherApp());
 }

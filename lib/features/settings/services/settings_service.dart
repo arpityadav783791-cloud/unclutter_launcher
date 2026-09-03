@@ -56,4 +56,58 @@ class SettingsService extends GetxService {
   Future<void> setThemeMode(String mode) async {
     await update(_settings.copyWith(themeMode: mode));
   }
+
+  Future<void> setHomeAlignment(String alignment) async {
+    await update(_settings.copyWith(homeAlignment: alignment));
+  }
+
+  Future<void> setHomeBottomAlignment(bool bottom) async {
+    await update(_settings.copyWith(homeBottomAlignment: bottom));
+  }
+
+  Future<void> setHomeAppsCount(int count) async {
+    await update(_settings.copyWith(homeAppsCount: count.clamp(0, 8)));
+  }
+
+  Future<void> setDateTimeVisibility(String visibility) async {
+    await update(_settings.copyWith(dateTimeVisibility: visibility));
+  }
+
+  Future<void> setShowStatusBar(bool show) async {
+    await update(_settings.copyWith(showStatusBar: show));
+  }
+
+  Future<void> setBoldFont(bool bold) async {
+    await update(_settings.copyWith(boldFont: bold));
+  }
+
+  Future<void> setAutoShowKeyboard(bool auto) async {
+    await update(_settings.copyWith(autoShowKeyboard: auto));
+  }
+
+  Future<void> setAutoLaunchSingleMatch(bool auto) async {
+    await update(_settings.copyWith(autoLaunchSingleMatch: auto));
+  }
+
+  Future<void> setSwipeDownAction(String action) async {
+    await update(_settings.copyWith(swipeDownAction: action));
+  }
+
+  Future<void> setSwipeLeftPackage(String? package) async {
+    await update(_settings.copyWith(
+      swipeLeftPackage: package,
+      clearSwipeLeft: package == null,
+    ));
+  }
+
+  Future<void> setSwipeRightPackage(String? package) async {
+    await update(_settings.copyWith(
+      swipeRightPackage: package,
+      clearSwipeRight: package == null,
+    ));
+  }
+
+  Future<void> setDoubleTapToLock(bool lock) async {
+    await update(_settings.copyWith(doubleTapToLock: lock));
+  }
 }

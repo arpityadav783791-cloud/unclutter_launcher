@@ -20,7 +20,11 @@ import '../../scheduled_block/controllers/schedule_controller.dart';
 import '../../scheduled_block/models/schedule_config.dart';
 import '../../settings/controllers/settings_controller.dart';
 import '../../timed_access/controllers/timed_access_controller.dart';
+import '../../../core/services/native_bridge.dart';
 import '../controllers/launcher_controller.dart';
+import '../services/home_gesture_service.dart';
+import '../widgets/home_clock_widget.dart';
+import '../widgets/home_favorites_widget.dart';
 
 class LauncherHomeView extends StatefulWidget {
   const LauncherHomeView({super.key});
@@ -34,6 +38,8 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
   final TextEditingController _searchController = TextEditingController();
   final RxString _searchQuery = ''.obs;
   int _currentPage = 0;
+  double _pullDownDistance = 0.0;
+  DateTime? _lastSwipeDownTime;
 
   @override
   void dispose() {
@@ -70,38 +76,71 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
       child: Scaffold(
         backgroundColor: backgroundColor,
         body: SafeArea(
-          child: PageView(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            physics: const BouncingScrollPhysics(),
-            onPageChanged: (index) {
-              setState(() {
-                _currentPage = index;
-              });
-            },
-            children: [
-              // ── PAGE 0: DEDICATED MINIMALIST HOME SCREEN (Black wallpaper, Clock, Favorites only) ──
-              _buildHomeScreen(
-                context: context,
-                controller: controller,
-                appsController: appsController,
-                favoritesController: favoritesController,
-                productivity: productivity,
-                timedAccess: timedAccess,
-                textColor: textColor,
-                secondaryColor: secondaryColor,
-              ),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (_currentPage == 0) {
+                if (notification is ScrollUpdateNotification) {
+                  if (notification.metrics.pixels <= 0 &&
+                      (notification.scrollDelta ?? 0) < 0) {
+                    _pullDownDistance += -(notification.scrollDelta ?? 0);
+                  }
+                } else if (notification is OverscrollNotification) {
+                  if (notification.overscroll < 0) {
+                    _pullDownDistance += -notification.overscroll;
+                  }
+                } else if (notification is ScrollEndNotification) {
+                  final velocity =
+                      notification.dragDetails?.primaryVelocity ?? 0;
+                  final now = DateTime.now();
+                  final canTrigger = _lastSwipeDownTime == null ||
+                      now.difference(_lastSwipeDownTime!) >
+                          const Duration(milliseconds: 600);
 
-              // ── PAGE 1: ALL APPS DRAWER (Search + Complete installed apps list) ──
-              _buildAllAppsDrawer(
-                context: context,
-                appsController: appsController,
-                favoritesController: favoritesController,
-                productivity: productivity,
-                textColor: textColor,
-                secondaryColor: secondaryColor,
-              ),
-            ],
+                  if (canTrigger &&
+                      (_pullDownDistance > 30 || velocity > 250)) {
+                    _lastSwipeDownTime = now;
+                    _pullDownDistance = 0;
+                    final gestureService = Get.find<HomeGestureService>();
+                    gestureService.handleSwipeDown(context);
+                  }
+                  _pullDownDistance = 0;
+                }
+              }
+              return false;
+            },
+            child: PageView(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (index) {
+                setState(() {
+                  _currentPage = index;
+                });
+              },
+              children: [
+                // ── PAGE 0: DEDICATED MINIMALIST HOME SCREEN (Black wallpaper, Clock, Favorites only) ──
+                _buildHomeScreen(
+                  context: context,
+                  controller: controller,
+                  appsController: appsController,
+                  favoritesController: favoritesController,
+                  productivity: productivity,
+                  timedAccess: timedAccess,
+                  textColor: textColor,
+                  secondaryColor: secondaryColor,
+                ),
+
+                // ── PAGE 1: ALL APPS DRAWER (Search + Complete installed apps list) ──
+                _buildAllAppsDrawer(
+                  context: context,
+                  appsController: appsController,
+                  favoritesController: favoritesController,
+                  productivity: productivity,
+                  textColor: textColor,
+                  secondaryColor: secondaryColor,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -118,184 +157,132 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
     required Color textColor,
     required Color secondaryColor,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Clock & Date (Tap or Long-press opens quick menu)
-          GestureDetector(
-            onLongPress: () => _showClockMenu(context),
-            onTap: () => _showClockMenu(context),
-            child: Obx(() {
-              final settings = Get.find<SettingsController>();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (settings.showClock.value)
-                    MinimalText(
-                      controller.currentTime.value,
-                      style: Theme.of(context)
-                          .textTheme
-                          .displayLarge
-                          ?.copyWith(color: textColor),
-                    ),
-                  if (settings.showClock.value && settings.showDate.value)
-                    const SizedBox(height: 2),
-                  if (settings.showDate.value)
-                    MinimalText(
-                      controller.currentDate.value,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: secondaryColor),
-                    ),
-                ],
-              );
-            }),
-          ),
+    final gestureService = Get.find<HomeGestureService>();
 
-          // Active Distraction Session Indicator (if any)
-          if (timedAccess != null)
-            Obx(() {
-              final session = timedAccess.currentSession.value;
-              if (session == null || session.isExpired) {
-                return const SizedBox.shrink();
-              }
-              final secs = timedAccess.remainingSeconds.value;
-              final m = secs ~/ 60;
-              final s = (secs % 60).toString().padLeft(2, '0');
-              return Container(
-                margin: const EdgeInsets.only(top: 14),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF161616),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF262626)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    MinimalText(
-                      '⏳ ${session.appName}: $m:$s remaining',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: textColor,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onDoubleTap: () => gestureService.handleDoubleTap(),
+      onHorizontalDragEnd: (details) {
+        final vx = details.primaryVelocity ?? 0;
+        if (vx < -200) {
+          gestureService.handleSwipeLeft();
+        } else if (vx > 200) {
+          gestureService.handleSwipeRight();
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Modular Clock, Date & Battery Widget
+            HomeClockWidget(
+              controller: controller,
+              textColor: textColor,
+              secondaryColor: secondaryColor,
+              onLongPress: () => _showClockMenu(context),
+            ),
 
-          const SizedBox(height: 28),
-          Container(
-            height: 1,
-            color: secondaryColor.withValues(alpha: 0.15),
-          ),
-          const SizedBox(height: 24),
-
-          // Favorites only on Home Screen
-          Expanded(
-            child: Obx(() {
-              final favorites = favoritesController.favoriteApps;
-
-              if (favorites.isEmpty) {
-                return Center(
-                  child: Column(
+            // Active Distraction Session Indicator (if any)
+            if (timedAccess != null)
+              Obx(() {
+                final session = timedAccess.currentSession.value;
+                if (session == null || session.isExpired) {
+                  return const SizedBox.shrink();
+                }
+                final secs = timedAccess.remainingSeconds.value;
+                final m = secs ~/ 60;
+                final s = (secs % 60).toString().padLeft(2, '0');
+                return Container(
+                  margin: const EdgeInsets.only(top: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161616),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF262626)),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       MinimalText(
-                        'No favorite apps yet',
+                        '⏳ ${session.appName}: $m:$s remaining',
                         style: TextStyle(
+                          fontSize: 13,
                           color: textColor,
-                          fontSize: 18,
                           fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      MinimalText(
-                        'Swipe up to view all apps\nLong-press an app to add to favorites',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: secondaryColor.withValues(alpha: 0.7),
-                          fontSize: 14,
-                          height: 1.4,
                         ),
                       ),
                     ],
                   ),
                 );
-              }
+              }),
 
-              return ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                itemCount: favorites.length,
-                itemBuilder: (context, index) {
-                  final app = favorites[index];
-                  final name = appsController.displayName(app);
+            const SizedBox(height: 28),
+            Container(
+              height: 1,
+              color: secondaryColor.withValues(alpha: 0.15),
+            ),
+            const SizedBox(height: 24),
 
-                  return _AppTile(
-                    name: name,
-                    isFavorite: true,
-                    textColor: textColor,
-                    secondaryColor: secondaryColor,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      productivity.handleAppLaunch(app.packageName);
-                    },
-                    onLongPress: () => _showAppOptions(
-                      context,
-                      app,
-                      name,
-                      favoritesController,
-                      productivity,
-                      true,
-                    ),
+            // Modular Favorites Widget (Alignment, Count Limits, Badges)
+            Expanded(
+              child: HomeFavoritesWidget(
+                favoritesController: favoritesController,
+                appsController: appsController,
+                productivity: productivity,
+                textColor: textColor,
+                secondaryColor: secondaryColor,
+                onLongPressApp: (ctx, app, name) {
+                  _showAppOptions(
+                    ctx,
+                    app,
+                    name,
+                    favoritesController,
+                    productivity,
+                    true,
                   );
                 },
-              );
-            }),
-          ),
+              ),
+            ),
 
-          // Bottom "Swipe up for all apps"
-          GestureDetector(
-            onTap: () {
-              _pageController.animateToPage(
-                1,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 4),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    MinimalText(
-                      'Swipe up for all apps',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: secondaryColor.withValues(alpha: 0.6),
+            // Bottom "Swipe up for all apps"
+            GestureDetector(
+              onTap: () {
+                _pageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MinimalText(
+                        'Swipe up for all apps',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: secondaryColor.withValues(alpha: 0.6),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    MinimalText(
-                      '↑',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: secondaryColor.withValues(alpha: 0.6),
+                      const SizedBox(width: 4),
+                      MinimalText(
+                        '↑',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: secondaryColor.withValues(alpha: 0.6),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -354,7 +341,58 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
                     border: InputBorder.none,
                     isDense: true,
                   ),
-                  onChanged: (val) => _searchQuery.value = val.trim(),
+                  onChanged: (val) {
+                    _searchQuery.value = val.trim();
+                    final settings = Get.find<SettingsController>();
+                    if (settings.autoLaunchSingleMatch.value) {
+                      final trimmed = val.trim();
+                      if (trimmed.isNotEmpty &&
+                          !val.startsWith(' ') &&
+                          !val.startsWith('!')) {
+                        final matches = appsController.apps.where((app) {
+                          final name =
+                              appsController.displayName(app).toLowerCase();
+                          return name.contains(trimmed.toLowerCase()) ||
+                              app.packageName
+                                  .toLowerCase()
+                                  .contains(trimmed.toLowerCase());
+                        }).toList();
+                        if (matches.length == 1) {
+                          HapticFeedback.lightImpact();
+                          productivity
+                              .handleAppLaunch(matches.first.packageName);
+                        }
+                      }
+                    }
+                  },
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (val) {
+                    final trimmed = val.trim();
+                    if (trimmed.isEmpty) return;
+                    if (trimmed.startsWith('!')) {
+                      if (Get.isRegistered<NativeBridge>()) {
+                        Get.find<NativeBridge>().openWebSearch(
+                            'https://duckduckgo.com/?q=${Uri.encodeComponent(trimmed)}');
+                      }
+                    } else {
+                      final matches = appsController.apps.where((app) {
+                        final name =
+                            appsController.displayName(app).toLowerCase();
+                        return name.contains(trimmed.toLowerCase()) ||
+                            app.packageName
+                                .toLowerCase()
+                                .contains(trimmed.toLowerCase());
+                      }).toList();
+                      if (matches.isNotEmpty) {
+                        productivity
+                            .handleAppLaunch(matches.first.packageName);
+                      } else {
+                        if (Get.isRegistered<NativeBridge>()) {
+                          Get.find<NativeBridge>().openWebSearch(trimmed);
+                        }
+                      }
+                    }
+                  },
                 ),
               ),
               Obx(() {
@@ -413,9 +451,33 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
 
               if (filtered.isEmpty) {
                 return Center(
-                  child: MinimalText(
-                    'No apps found',
-                    style: TextStyle(color: secondaryColor, fontSize: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MinimalText(
+                        'No apps found',
+                        style: TextStyle(color: secondaryColor, fontSize: 16),
+                      ),
+                      if (query.trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            if (Get.isRegistered<NativeBridge>()) {
+                              Get.find<NativeBridge>()
+                                  .openWebSearch(query.trim());
+                            }
+                          },
+                          child: MinimalText(
+                            'Search web for "$query" ↵',
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 14,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 );
               }
@@ -431,6 +493,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
                   return _AppTile(
                     name: name,
                     isFavorite: isFav,
+                    isRecentInstall: app.isRecentInstall,
                     textColor: textColor,
                     secondaryColor: secondaryColor,
                     onTap: () {
@@ -618,6 +681,27 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
                   },
                 ),
                 _OptionTile(
+                  label: 'App Info',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (Get.isRegistered<NativeBridge>()) {
+                      Get.find<NativeBridge>().openAppDetails(app.packageName);
+                    }
+                  },
+                ),
+                if (!app.isSystemApp)
+                  _OptionTile(
+                    label: 'Uninstall',
+                    color: Colors.redAccent,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (Get.isRegistered<NativeBridge>()) {
+                        Get.find<NativeBridge>().uninstallApp(app.packageName);
+                      }
+                    },
+                  ),
+                _OptionTile(
                   label: 'Hide',
                   color: textColor,
                   onTap: () async {
@@ -760,7 +844,26 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
                   height: 1,
                   color: secondaryColor.withValues(alpha: 0.12),
                 ),
-                const SizedBox(height: 8),
+                _OptionTile(
+                  label: 'Clock',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (Get.isRegistered<NativeBridge>()) {
+                      Get.find<NativeBridge>().openClock();
+                    }
+                  },
+                ),
+                _OptionTile(
+                  label: 'Calendar',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (Get.isRegistered<NativeBridge>()) {
+                      Get.find<NativeBridge>().openCalendar();
+                    }
+                  },
+                ),
                 _OptionTile(
                   label: 'Screen Time',
                   color: textColor,
@@ -1119,6 +1222,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
 class _AppTile extends StatelessWidget {
   final String name;
   final bool isFavorite;
+  final bool isRecentInstall;
   final Color textColor;
   final Color secondaryColor;
   final VoidCallback onTap;
@@ -1127,6 +1231,7 @@ class _AppTile extends StatelessWidget {
   const _AppTile({
     required this.name,
     required this.isFavorite,
+    this.isRecentInstall = false,
     required this.textColor,
     required this.secondaryColor,
     required this.onTap,
@@ -1135,6 +1240,12 @@ class _AppTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = Get.isRegistered<SettingsController>()
+        ? Get.find<SettingsController>()
+        : null;
+    final isBold = settings?.boldFont.value ?? false;
+    final badge = isRecentInstall ? ' ✦' : '';
+
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -1145,10 +1256,10 @@ class _AppTile extends StatelessWidget {
           children: [
             Expanded(
               child: MinimalText(
-                name,
+                '$name$badge',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
                   color: textColor,
                   letterSpacing: 0.15,
                 ),

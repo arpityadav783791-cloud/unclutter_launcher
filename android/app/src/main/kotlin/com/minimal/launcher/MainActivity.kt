@@ -1,5 +1,6 @@
 package com.minimal.launcher
 
+import android.Manifest
 import android.app.AppOpsManager
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
@@ -8,10 +9,17 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
+import android.app.SearchManager
+import android.app.admin.DevicePolicyManager
+import android.net.Uri
+import android.os.BatteryManager
+import android.provider.AlarmClock
 import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -22,6 +30,8 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.minimal.launcher/native"
     private var methodChannel: MethodChannel? = null
     private lateinit var protectedModeManager: ProtectedModeManager
+    private var pendingNotificationResult: MethodChannel.Result? = null
+    private val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
 
     private var activeSessionPackage: String? = null
     private var activeSessionExpiryMillis: Long = 0L
@@ -122,6 +132,70 @@ class MainActivity : FlutterActivity() {
                         protectedModeManager.requestDefaultLauncher()
                         result.success(null)
                     }
+                    // ── Notifications ─────────────────────────────
+                    "hasNotificationPermission" -> {
+                        result.success(hasNotificationPermission())
+                    }
+                    "requestNotificationPermission" -> {
+                        requestNotificationPermission(result)
+                    }
+                    "isNotificationPermissionRequired" -> {
+                        result.success(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                    }
+                    "openNotificationSettings" -> {
+                        openNotificationSettings()
+                        result.success(null)
+                    }
+                    // ── Enforcement ───────────────────────────────
+                    "hasEnforcementPermission" -> {
+                        result.success(true)
+                    }
+                    "isEnforcementPermissionRequired" -> {
+                        result.success(false)
+                    }
+                    "openEnforcementSettings" -> {
+                        result.success(null)
+                    }
+                    // ── Olauncher System & Gesture Actions ─────────
+                    "expandStatusBar" -> {
+                        expandStatusBar()
+                        result.success(null)
+                    }
+                    "openAppDetails" -> {
+                        val pkg = call.argument<String>("packageName")
+                        if (pkg != null) {
+                            openAppDetails(pkg)
+                            result.success(true)
+                        } else {
+                            result.error("INVALID_ARGUMENT", "packageName is required", null)
+                        }
+                    }
+                    "uninstallApp" -> {
+                        val pkg = call.argument<String>("packageName")
+                        if (pkg != null) {
+                            uninstallApp(pkg)
+                            result.success(true)
+                        } else {
+                            result.error("INVALID_ARGUMENT", "packageName is required", null)
+                        }
+                    }
+                    "openClock" -> {
+                        result.success(openClock())
+                    }
+                    "openCalendar" -> {
+                        result.success(openCalendar())
+                    }
+                    "getBatteryLevel" -> {
+                        result.success(getBatteryLevel())
+                    }
+                    "openWebSearch" -> {
+                        val query = call.argument<String>("query") ?: ""
+                        openWebSearch(query)
+                        result.success(null)
+                    }
+                    "lockScreen" -> {
+                        result.success(lockScreen())
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -173,16 +247,195 @@ class MainActivity : FlutterActivity() {
                 false
             }
 
+            val isGame = try {
+                val appInfo = pm.getApplicationInfo(pkg, 0)
+                ((appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0) ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appInfo.category == ApplicationInfo.CATEGORY_GAME)
+            } catch (e: Exception) {
+                false
+            }
+
+            val category = try {
+                val appInfo = pm.getApplicationInfo(pkg, 0)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    appInfo.category
+                } else {
+                    -1
+                }
+            } catch (e: Exception) {
+                -1
+            }
+
+            val installTime = try {
+                pm.getPackageInfo(pkg, 0).firstInstallTime
+            } catch (e: Exception) {
+                0L
+            }
+
             apps.add(
                 mapOf(
                     "name" to appName,
                     "packageName" to pkg,
-                    "isSystemApp" to isSystemApp
+                    "isSystemApp" to isSystemApp,
+                    "isGame" to isGame,
+                    "category" to category,
+                    "installTime" to installTime
                 )
             )
         }
 
         return apps.sortedBy { (it["name"] as? String)?.lowercase() ?: "" }
+    }
+
+    private fun expandStatusBar() {
+        try {
+            val statusBarService = getSystemService("statusbar")
+            val statusBarManager = Class.forName("android.app.StatusBarManager")
+            val method = statusBarManager.getMethod("expandNotificationsPanel")
+            method.invoke(statusBarService)
+        } catch (e: Exception) {
+            try {
+                val statusBarService = getSystemService("statusbar")
+                val statusBarManager = Class.forName("android.app.StatusBarManager")
+                val method = statusBarManager.getMethod("expand")
+                method.invoke(statusBarService)
+            } catch (e2: Exception) {
+                // Ignore failure
+            }
+        }
+    }
+
+    private fun openAppDetails(pkg: String) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", pkg, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        }
+    }
+
+    private fun uninstallApp(pkg: String) {
+        try {
+            val intent = Intent(Intent.ACTION_DELETE).apply {
+                data = Uri.fromParts("package", pkg, null)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    private fun openClock(): Boolean {
+        return try {
+            val intent = Intent(AlarmClock.ACTION_SHOW_ALARMS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+                true
+            } else {
+                val knownClocks = listOf(
+                    "com.google.android.deskclock",
+                    "com.android.deskclock",
+                    "com.sec.android.app.clockpackage",
+                    "com.oneplus.deskclock",
+                    "com.coloros.alarmclock",
+                    "com.miui.clock"
+                )
+                for (p in knownClocks) {
+                    val launch = packageManager.getLaunchIntentForPackage(p)
+                    if (launch != null) {
+                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(launch)
+                        return true
+                    }
+                }
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun openCalendar(): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_APP_CALENDAR)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+                true
+            } else {
+                val knownCalendars = listOf(
+                    "com.google.android.calendar",
+                    "com.android.calendar",
+                    "com.samsung.android.calendar",
+                    "com.oneplus.calendar",
+                    "com.miui.calendar"
+                )
+                for (p in knownCalendars) {
+                    val launch = packageManager.getLaunchIntentForPackage(p)
+                    if (launch != null) {
+                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(launch)
+                        return true
+                    }
+                }
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun getBatteryLevel(): Int {
+        return try {
+            val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        } catch (e: Exception) {
+            -1
+        }
+    }
+
+    private fun openWebSearch(query: String) {
+        try {
+            val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                putExtra(SearchManager.QUERY, query)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+            } else {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(query))).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(browserIntent)
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    private fun lockScreen(): Boolean {
+        return try {
+            if (protectedModeManager.isDeviceOwner()) {
+                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                dpm.lockNow()
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun launchApp(packageName: String): Boolean {
@@ -408,6 +661,60 @@ class MainActivity : FlutterActivity() {
             runOnUiThread {
                 methodChannel?.invokeMethod("onRecoveryTriggered", null)
             }
+        }
+    }
+
+    // ── Notifications ─────────────────────────────────────────
+
+    private fun hasNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else {
+            NotificationManagerCompat.from(this).areNotificationsEnabled()
+        }
+    }
+
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                result.success(true)
+            } else {
+                pendingNotificationResult = result
+                requestPermissions(
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        } else {
+            result.success(NotificationManagerCompat.from(this).areNotificationsEnabled())
+        }
+    }
+
+    private fun openNotificationSettings() {
+        try {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            pendingNotificationResult?.success(granted)
+            pendingNotificationResult = null
         }
     }
 

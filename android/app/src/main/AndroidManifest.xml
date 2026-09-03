@@ -13,6 +13,15 @@
         android:name="android.permission.PACKAGE_USAGE_STATS"
         android:protectionLevel="signature" />
 
+    <!-- Notifications permission on Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Expand status bar / notifications panel -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+
+    <!-- Request package uninstall directly from app context menu -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
     <application
         android:label="Minimal Launcher"
         android:name="${applicationName}"

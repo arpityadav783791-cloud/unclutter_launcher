@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/minimal_text.dart';
 import '../../../core/routes/app_routes.dart';
+import '../../../core/services/permission_service.dart';
+import '../../onboarding/services/onboarding_service.dart';
 import '../controllers/settings_controller.dart';
 
 class SettingsView extends StatelessWidget {
@@ -51,9 +53,21 @@ class SettingsView extends StatelessWidget {
                   physics: const BouncingScrollPhysics(),
                   children: [
                     // ── Appearance ───────────────────────────
-                    _SectionLabel('APPEARANCE', secondaryColor),
+                    _SectionLabel('APPEARANCE & TYPOGRAPHY', secondaryColor),
                     const SizedBox(height: 12),
 
+                    Obx(() => _ToggleRow(
+                          label: 'Show status bar',
+                          value: controller.showStatusBar.value,
+                          textColor: textColor,
+                          onTap: controller.toggleStatusBar,
+                        )),
+                    Obx(() => _ToggleRow(
+                          label: 'Bold font',
+                          value: controller.boldFont.value,
+                          textColor: textColor,
+                          onTap: controller.toggleBoldFont,
+                        )),
                     Obx(() => _ToggleRow(
                           label: 'Show clock',
                           value: controller.showClock.value,
@@ -67,7 +81,41 @@ class SettingsView extends StatelessWidget {
                           onTap: controller.toggleDate,
                         )),
 
+                    const SizedBox(height: 12),
+                    MinimalText(
+                      'Date & time visibility',
+                      style: TextStyle(fontSize: 16, color: textColor),
+                    ),
                     const SizedBox(height: 8),
+                    Obx(() {
+                      final v = controller.dateTimeVisibility.value;
+                      return Column(
+                        children: [
+                          _SelectRow(
+                            label: 'Clock & Date',
+                            selected: v == 'on',
+                            textColor: textColor,
+                            onTap: () => controller.setDateTimeVisibility('on'),
+                          ),
+                          _SelectRow(
+                            label: 'Date only',
+                            selected: v == 'date_only',
+                            textColor: textColor,
+                            onTap: () =>
+                                controller.setDateTimeVisibility('date_only'),
+                          ),
+                          _SelectRow(
+                            label: 'Hidden',
+                            selected: v == 'off',
+                            textColor: textColor,
+                            onTap: () =>
+                                controller.setDateTimeVisibility('off'),
+                          ),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 12),
                     MinimalText(
                       'Theme',
                       style: TextStyle(fontSize: 16, color: textColor),
@@ -99,7 +147,7 @@ class SettingsView extends StatelessWidget {
                       );
                     }),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     MinimalText(
                       'Text size',
                       style: TextStyle(fontSize: 16, color: textColor),
@@ -130,6 +178,161 @@ class SettingsView extends StatelessWidget {
                         ],
                       );
                     }),
+
+                    const SizedBox(height: 28),
+                    Container(
+                      height: 1,
+                      color: secondaryColor.withValues(alpha: 0.12),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Home Customization ───────────────────
+                    _SectionLabel('HOME SCREEN', secondaryColor),
+                    const SizedBox(height: 12),
+
+                    MinimalText(
+                      'Alignment',
+                      style: TextStyle(fontSize: 16, color: textColor),
+                    ),
+                    const SizedBox(height: 8),
+                    Obx(() {
+                      final align = controller.homeAlignment.value;
+                      return Column(
+                        children: [
+                          _SelectRow(
+                            label: 'Left',
+                            selected: align == 'left',
+                            textColor: textColor,
+                            onTap: () => controller.setHomeAlignment('left'),
+                          ),
+                          _SelectRow(
+                            label: 'Center',
+                            selected: align == 'center',
+                            textColor: textColor,
+                            onTap: () => controller.setHomeAlignment('center'),
+                          ),
+                          _SelectRow(
+                            label: 'Right',
+                            selected: align == 'right',
+                            textColor: textColor,
+                            onTap: () => controller.setHomeAlignment('right'),
+                          ),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 8),
+                    Obx(() => _ToggleRow(
+                          label: 'Bottom alignment',
+                          value: controller.homeBottomAlignment.value,
+                          textColor: textColor,
+                          onTap: controller.toggleHomeBottomAlignment,
+                        )),
+
+                    const SizedBox(height: 12),
+                    Obx(() {
+                      final count = controller.homeAppsCount.value;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          MinimalText(
+                            'Home apps count: $count',
+                            style: TextStyle(fontSize: 16, color: textColor),
+                          ),
+                          Slider(
+                            value: count.toDouble(),
+                            min: 0,
+                            max: 8,
+                            divisions: 8,
+                            activeColor: textColor,
+                            inactiveColor:
+                                secondaryColor.withValues(alpha: 0.2),
+                            onChanged: (val) =>
+                                controller.setHomeAppsCount(val.toInt()),
+                          ),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 28),
+                    Container(
+                      height: 1,
+                      color: secondaryColor.withValues(alpha: 0.12),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Gestures ─────────────────────────────
+                    _SectionLabel('GESTURES', secondaryColor),
+                    const SizedBox(height: 12),
+
+                    MinimalText(
+                      'Swipe down action',
+                      style: TextStyle(fontSize: 16, color: textColor),
+                    ),
+                    const SizedBox(height: 8),
+                    Obx(() {
+                      final action = controller.swipeDownAction.value;
+                      return Column(
+                        children: [
+                          _SelectRow(
+                            label: 'Notifications',
+                            selected: action == 'notifications',
+                            textColor: textColor,
+                            onTap: () =>
+                                controller.setSwipeDownAction('notifications'),
+                          ),
+                          _SelectRow(
+                            label: 'Search',
+                            selected: action == 'search',
+                            textColor: textColor,
+                            onTap: () => controller.setSwipeDownAction('search'),
+                          ),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 8),
+                    Obx(() => _ToggleRow(
+                          label: 'Double tap to lock screen',
+                          value: controller.doubleTapToLock.value,
+                          textColor: textColor,
+                          onTap: controller.toggleDoubleTapToLock,
+                        )),
+
+                    _InfoRow('Swipe left', 'Camera (or configured)', textColor,
+                        secondaryColor),
+                    _InfoRow('Swipe right', 'Phone (or configured)', textColor,
+                        secondaryColor),
+
+                    const SizedBox(height: 28),
+                    Container(
+                      height: 1,
+                      color: secondaryColor.withValues(alpha: 0.12),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Search & Drawer ──────────────────────
+                    _SectionLabel('SEARCH & APP DRAWER', secondaryColor),
+                    const SizedBox(height: 12),
+
+                    Obx(() => _ToggleRow(
+                          label: 'Auto-show keyboard',
+                          value: controller.autoShowKeyboard.value,
+                          textColor: textColor,
+                          onTap: controller.toggleAutoShowKeyboard,
+                        )),
+                    Obx(() => _ToggleRow(
+                          label: 'Auto-launch single match',
+                          value: controller.autoLaunchSingleMatch.value,
+                          textColor: textColor,
+                          onTap: controller.toggleAutoLaunchSingleMatch,
+                        )),
+                    _InfoRow('!query', 'DuckDuckGo Bang search', textColor,
+                        secondaryColor),
+                    _InfoRow(
+                        '0 matches', 'Web search fallback', textColor, secondaryColor),
+                    _InfoRow(' ✦ badge', 'Newly installed (< 24h)', textColor,
+                        secondaryColor),
 
                     const SizedBox(height: 28),
                     Container(
@@ -185,46 +388,35 @@ class SettingsView extends StatelessWidget {
                     ),
                     const SizedBox(height: 28),
 
-                    // ── Apps ─────────────────────────────────
-                    _SectionLabel('APPS', secondaryColor),
+                    // ── System & Protection ──────────────────
+                    _SectionLabel('SYSTEM & PROTECTION', secondaryColor),
                     const SizedBox(height: 12),
                     _LinkRow(
-                      label: 'Favorites',
+                      label: 'Default Launcher',
                       textColor: textColor,
-                      subtitle: 'Long-press app → Add to favorites',
+                      subtitle: 'Set Minimalist as home screen',
                       secondaryColor: secondaryColor,
+                      onTap: () {
+                        if (Get.isRegistered<PermissionService>()) {
+                          Get.find<PermissionService>()
+                              .openDefaultLauncherSettings();
+                        }
+                      },
                     ),
                     _LinkRow(
-                      label: 'Hidden apps',
+                      label: 'Digital Detox Onboarding',
                       textColor: textColor,
-                      subtitle: 'Long-press app → Hide',
+                      subtitle: 'Review setup and permissions',
                       secondaryColor: secondaryColor,
+                      onTap: () async {
+                        if (Get.isRegistered<OnboardingService>()) {
+                          await Get.find<OnboardingService>().resetOnboarding();
+                        }
+                        if (context.mounted) {
+                          context.push(AppRoutes.onboarding);
+                        }
+                      },
                     ),
-                    _LinkRow(
-                      label: 'Rename apps',
-                      textColor: textColor,
-                      subtitle: 'Long-press app → Rename',
-                      secondaryColor: secondaryColor,
-                    ),
-
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // ── Gestures ─────────────────────────────
-                    _SectionLabel('GESTURES', secondaryColor),
-                    const SizedBox(height: 12),
-                    _InfoRow('Tap app', 'Launch', textColor, secondaryColor),
-                    _InfoRow('Long-press app', 'Options', textColor, secondaryColor),
-                    _InfoRow('Swipe up', 'Search', textColor, secondaryColor),
-                    _InfoRow('Long-press clock', 'Screen Time / Focus', textColor, secondaryColor),
-
-                    // ── Protection ──────────────────────────
-                    _SectionLabel('PROTECTION', secondaryColor),
-                    const SizedBox(height: 12),
                     _LinkRow(
                       label: 'Protected Mode',
                       textColor: textColor,
@@ -270,19 +462,20 @@ class SettingsView extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  final String text;
+  final String label;
   final Color color;
-  const _SectionLabel(this.text, this.color);
+
+  const _SectionLabel(this.label, this.color);
 
   @override
   Widget build(BuildContext context) {
     return MinimalText(
-      text,
+      label,
       style: TextStyle(
-        fontSize: 12,
+        fontSize: 11,
         letterSpacing: 1.2,
-        fontWeight: FontWeight.w500,
-        color: color,
+        fontWeight: FontWeight.w600,
+        color: color.withValues(alpha: 0.5),
       ),
     );
   }
@@ -309,16 +502,19 @@ class _ToggleRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: MinimalText(
-                label,
-                style: TextStyle(fontSize: 16, color: textColor),
-              ),
+            MinimalText(
+              label,
+              style: TextStyle(fontSize: 16, color: textColor),
             ),
             MinimalText(
               value ? 'On' : 'Off',
-              style: TextStyle(fontSize: 15, color: textColor),
+              style: TextStyle(
+                fontSize: 14,
+                color: value ? AppColors.accent : textColor.withValues(alpha: 0.4),
+                fontWeight: value ? FontWeight.w600 : FontWeight.w400,
+              ),
             ),
           ],
         ),
@@ -346,10 +542,24 @@ class _SelectRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        child: MinimalText(
-          selected ? '✓  $label' : '    $label',
-          style: TextStyle(fontSize: 16, color: textColor),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            MinimalText(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                color: selected ? textColor : textColor.withValues(alpha: 0.4),
+                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+              ),
+            ),
+            if (selected)
+              const MinimalText(
+                '✓',
+                style: TextStyle(fontSize: 14, color: AppColors.accent),
+              ),
+          ],
         ),
       ),
     );
@@ -378,23 +588,37 @@ class _LinkRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            MinimalText(
-              label,
-              style: TextStyle(fontSize: 16, color: textColor),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MinimalText(
+                  label,
+                  style: TextStyle(fontSize: 16, color: textColor),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  MinimalText(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: secondaryColor?.withValues(alpha: 0.5) ??
+                          textColor.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 2),
+            if (onTap != null)
               MinimalText(
-                subtitle!,
+                '→',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: secondaryColor?.withValues(alpha: 0.7),
+                  fontSize: 16,
+                  color: textColor.withValues(alpha: 0.4),
                 ),
               ),
-            ],
           ],
         ),
       ),
@@ -403,27 +627,26 @@ class _LinkRow extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  final String left;
-  final String right;
+  final String label;
+  final String value;
   final Color textColor;
   final Color secondaryColor;
 
-  const _InfoRow(this.left, this.right, this.textColor, this.secondaryColor);
+  const _InfoRow(this.label, this.value, this.textColor, this.secondaryColor);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: MinimalText(
-              left,
-              style: TextStyle(fontSize: 15, color: textColor),
-            ),
+          MinimalText(
+            label,
+            style: TextStyle(fontSize: 15, color: textColor),
           ),
           MinimalText(
-            right,
+            value,
             style: TextStyle(fontSize: 14, color: secondaryColor),
           ),
         ],

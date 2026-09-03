@@ -146,4 +146,180 @@ class NativeBridge extends GetxService {
       // ignore
     }
   }
+
+  // ── Permissions ─────────────────────────────────────────────
+
+  /// Checks if Usage Access permission is granted
+  Future<bool> hasUsagePermission() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('hasUsagePermission');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens the system Usage Access settings screen
+  Future<void> openUsageAccessSettings() async {
+    try {
+      await _channel.invokeMethod('openUsageAccessSettings');
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Checks whether notification permission is currently granted
+  Future<bool> hasNotificationPermission() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('hasNotificationPermission');
+      return result ?? true;
+    } on PlatformException {
+      return true;
+    }
+  }
+
+  /// Requests notification permission on platforms where required
+  Future<bool> requestNotificationPermission() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('requestNotificationPermission');
+      return result ?? true;
+    } on PlatformException {
+      return true;
+    }
+  }
+
+  /// Returns true if the device runtime requires explicit notification permission (Android 13+)
+  Future<bool> isNotificationPermissionRequired() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('isNotificationPermissionRequired');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens notification settings for this application
+  Future<void> openNotificationSettings() async {
+    try {
+      await _channel.invokeMethod('openNotificationSettings');
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Checks if enforcement permission is satisfied
+  Future<bool> hasEnforcementPermission() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('hasEnforcementPermission');
+      return result ?? true;
+    } on PlatformException {
+      return true;
+    }
+  }
+
+  /// Returns whether this device architecture requires additional enforcement permission
+  Future<bool> isEnforcementPermissionRequired() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('isEnforcementPermissionRequired');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens enforcement settings screen if applicable
+  Future<void> openEnforcementSettings() async {
+    try {
+      await _channel.invokeMethod('openEnforcementSettings');
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Expands notifications drawer / status bar
+  Future<void> expandStatusBar() async {
+    try {
+      await _channel.invokeMethod('expandStatusBar');
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Opens application details in system settings
+  Future<bool> openAppDetails(String packageName) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('openAppDetails', {
+        'packageName': packageName,
+      });
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Prompts system uninstaller for the application
+  Future<bool> uninstallApp(String packageName) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('uninstallApp', {
+        'packageName': packageName,
+      });
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens default or system clock / alarm app
+  Future<bool> openClock() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('openClock');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens default or system calendar app
+  Future<bool> openCalendar() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('openCalendar');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Queries device battery level percentage (-1 if unknown)
+  Future<int> getBatteryLevel() async {
+    try {
+      final result = await _channel.invokeMethod<int>('getBatteryLevel');
+      return result ?? -1;
+    } on PlatformException {
+      return -1;
+    }
+  }
+
+  /// Opens device web search or browser with query
+  Future<void> openWebSearch(String query) async {
+    try {
+      await _channel.invokeMethod('openWebSearch', {'query': query});
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Locks device screen
+  Future<bool> lockScreen() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('lockScreen');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
 }

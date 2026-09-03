@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:get/get.dart';
 import '../services/mindful_delay_service.dart';
-import '../models/mindful_delay_config.dart';
 
 class MindfulDelayController extends GetxController {
   final MindfulDelayService _service = Get.find<MindfulDelayService>();

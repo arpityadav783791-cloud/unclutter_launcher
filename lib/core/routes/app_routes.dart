@@ -1,4 +1,5 @@
 class AppRoutes {
+  static const String onboarding = '/onboarding';
   static const String launcher = '/';
   static const String search = '/search';
   static const String settings = '/settings';

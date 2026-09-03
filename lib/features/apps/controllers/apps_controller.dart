@@ -42,6 +42,7 @@ class AppsController extends GetxController {
     try {
       final result = await _nativeAppService.getInstalledApps();
       allApps.assignAll(result);
+      await _configService.autoDetectDistractions(result);
       _applyVisibility();
       _hasLoaded = true;
       _lastLoadedAt = DateTime.now();

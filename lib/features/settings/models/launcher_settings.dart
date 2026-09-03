@@ -4,11 +4,37 @@ class LauncherSettings {
   final double textScale; // 0.85 – 1.25
   final String themeMode; // system | light | dark
 
+  // ── Olauncher Subsystem Settings ──
+  final String homeAlignment; // left | center | right
+  final bool homeBottomAlignment;
+  final int homeAppsCount; // 0 to 8
+  final String dateTimeVisibility; // on | date_only | off
+  final bool showStatusBar;
+  final bool boldFont;
+  final bool autoShowKeyboard;
+  final bool autoLaunchSingleMatch;
+  final String swipeDownAction; // notifications | search
+  final String? swipeLeftPackage;
+  final String? swipeRightPackage;
+  final bool doubleTapToLock;
+
   const LauncherSettings({
     this.showClock = true,
     this.showDate = true,
     this.textScale = 1.0,
     this.themeMode = 'system',
+    this.homeAlignment = 'left',
+    this.homeBottomAlignment = false,
+    this.homeAppsCount = 4,
+    this.dateTimeVisibility = 'on',
+    this.showStatusBar = true,
+    this.boldFont = false,
+    this.autoShowKeyboard = true,
+    this.autoLaunchSingleMatch = true,
+    this.swipeDownAction = 'notifications',
+    this.swipeLeftPackage,
+    this.swipeRightPackage,
+    this.doubleTapToLock = false,
   });
 
   factory LauncherSettings.fromMap(Map<String, dynamic> map) {
@@ -17,6 +43,18 @@ class LauncherSettings {
       showDate: map['showDate'] as bool? ?? true,
       textScale: (map['textScale'] as num?)?.toDouble() ?? 1.0,
       themeMode: map['themeMode'] as String? ?? 'system',
+      homeAlignment: map['homeAlignment'] as String? ?? 'left',
+      homeBottomAlignment: map['homeBottomAlignment'] as bool? ?? false,
+      homeAppsCount: (map['homeAppsCount'] as num?)?.toInt() ?? 4,
+      dateTimeVisibility: map['dateTimeVisibility'] as String? ?? 'on',
+      showStatusBar: map['showStatusBar'] as bool? ?? true,
+      boldFont: map['boldFont'] as bool? ?? false,
+      autoShowKeyboard: map['autoShowKeyboard'] as bool? ?? true,
+      autoLaunchSingleMatch: map['autoLaunchSingleMatch'] as bool? ?? true,
+      swipeDownAction: map['swipeDownAction'] as String? ?? 'notifications',
+      swipeLeftPackage: map['swipeLeftPackage'] as String?,
+      swipeRightPackage: map['swipeRightPackage'] as String?,
+      doubleTapToLock: map['doubleTapToLock'] as bool? ?? false,
     );
   }
 
@@ -26,6 +64,18 @@ class LauncherSettings {
       'showDate': showDate,
       'textScale': textScale,
       'themeMode': themeMode,
+      'homeAlignment': homeAlignment,
+      'homeBottomAlignment': homeBottomAlignment,
+      'homeAppsCount': homeAppsCount,
+      'dateTimeVisibility': dateTimeVisibility,
+      'showStatusBar': showStatusBar,
+      'boldFont': boldFont,
+      'autoShowKeyboard': autoShowKeyboard,
+      'autoLaunchSingleMatch': autoLaunchSingleMatch,
+      'swipeDownAction': swipeDownAction,
+      'swipeLeftPackage': swipeLeftPackage,
+      'swipeRightPackage': swipeRightPackage,
+      'doubleTapToLock': doubleTapToLock,
     };
   }
 
@@ -34,12 +84,42 @@ class LauncherSettings {
     bool? showDate,
     double? textScale,
     String? themeMode,
+    String? homeAlignment,
+    bool? homeBottomAlignment,
+    int? homeAppsCount,
+    String? dateTimeVisibility,
+    bool? showStatusBar,
+    bool? boldFont,
+    bool? autoShowKeyboard,
+    bool? autoLaunchSingleMatch,
+    String? swipeDownAction,
+    String? swipeLeftPackage,
+    String? swipeRightPackage,
+    bool? doubleTapToLock,
+    bool clearSwipeLeft = false,
+    bool clearSwipeRight = false,
   }) {
     return LauncherSettings(
       showClock: showClock ?? this.showClock,
       showDate: showDate ?? this.showDate,
       textScale: textScale ?? this.textScale,
       themeMode: themeMode ?? this.themeMode,
+      homeAlignment: homeAlignment ?? this.homeAlignment,
+      homeBottomAlignment: homeBottomAlignment ?? this.homeBottomAlignment,
+      homeAppsCount: homeAppsCount ?? this.homeAppsCount,
+      dateTimeVisibility: dateTimeVisibility ?? this.dateTimeVisibility,
+      showStatusBar: showStatusBar ?? this.showStatusBar,
+      boldFont: boldFont ?? this.boldFont,
+      autoShowKeyboard: autoShowKeyboard ?? this.autoShowKeyboard,
+      autoLaunchSingleMatch:
+          autoLaunchSingleMatch ?? this.autoLaunchSingleMatch,
+      swipeDownAction: swipeDownAction ?? this.swipeDownAction,
+      swipeLeftPackage:
+          clearSwipeLeft ? null : (swipeLeftPackage ?? this.swipeLeftPackage),
+      swipeRightPackage: clearSwipeRight
+          ? null
+          : (swipeRightPackage ?? this.swipeRightPackage),
+      doubleTapToLock: doubleTapToLock ?? this.doubleTapToLock,
     );
   }
 }

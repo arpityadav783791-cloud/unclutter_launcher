@@ -29,12 +29,46 @@ import '../../features/protected_mode/services/protected_mode_service.dart';
 import '../../features/protected_mode/controllers/protected_mode_controller.dart';
 import '../../features/protected_mode/views/protected_mode_view.dart';
 import '../../features/protected_mode/views/protected_mode_recovery_view.dart';
+import '../../features/onboarding/services/onboarding_service.dart';
+import '../../features/onboarding/views/onboarding_view.dart';
+import '../../features/launcher/services/home_gesture_service.dart';
+import '../services/permission_service.dart';
 import 'app_routes.dart';
 
 class AppRouter {
+  static String _determineInitialLocation() {
+    if (Get.isRegistered<OnboardingService>() &&
+        !Get.find<OnboardingService>().isOnboardingCompleted) {
+      return AppRoutes.onboarding;
+    }
+    return AppRoutes.launcher;
+  }
+
   static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.launcher,
+    initialLocation: _determineInitialLocation(),
+    redirect: (context, state) {
+      if (!Get.isRegistered<OnboardingService>()) return null;
+      final onboardingCompleted =
+          Get.find<OnboardingService>().isOnboardingCompleted;
+      final isOnboarding = state.matchedLocation == AppRoutes.onboarding;
+
+      if (!onboardingCompleted && !isOnboarding) {
+        return AppRoutes.onboarding;
+      }
+      if (onboardingCompleted && isOnboarding) {
+        return AppRoutes.launcher;
+      }
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: AppRoutes.onboarding,
+        name: 'onboarding',
+        builder: (context, state) {
+          _ensureCoreBindings();
+          return const OnboardingView();
+        },
+      ),
       GoRoute(
         path: AppRoutes.launcher,
         name: 'launcher',
@@ -166,8 +200,17 @@ class AppRouter {
     if (!Get.isRegistered<ProtectedModeController>()) {
       Get.put(ProtectedModeController(), permanent: true);
     }
+    if (!Get.isRegistered<PermissionService>()) {
+      Get.put(PermissionService(), permanent: true);
+    }
+    if (!Get.isRegistered<OnboardingService>()) {
+      Get.put(OnboardingService(), permanent: true);
+    }
     if (!Get.isRegistered<ProductivityController>()) {
       Get.put(ProductivityController(), permanent: true);
+    }
+    if (!Get.isRegistered<HomeGestureService>()) {
+      Get.put(HomeGestureService(), permanent: true);
     }
   }
 }

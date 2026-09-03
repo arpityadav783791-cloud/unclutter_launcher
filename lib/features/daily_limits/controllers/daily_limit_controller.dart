@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import '../../screen_time/services/usage_stats_service.dart';
-import '../models/daily_limit_config.dart';
 import '../services/daily_limit_service.dart';
 
 class DailyLimitController extends GetxController {

@@ -78,6 +78,57 @@ class FakeNativeBridge extends GetxService implements NativeBridge {
 
   @override
   Future<void> requestDefaultLauncher() async {}
+
+  @override
+  Future<bool> hasUsagePermission() async => false;
+
+  @override
+  Future<void> openUsageAccessSettings() async {}
+
+  @override
+  Future<bool> hasNotificationPermission() async => true;
+
+  @override
+  Future<bool> requestNotificationPermission() async => true;
+
+  @override
+  Future<bool> isNotificationPermissionRequired() async => false;
+
+  @override
+  Future<void> openNotificationSettings() async {}
+
+  @override
+  Future<bool> hasEnforcementPermission() async => true;
+
+  @override
+  Future<bool> isEnforcementPermissionRequired() async => false;
+
+  @override
+  Future<void> openEnforcementSettings() async {}
+
+  @override
+  Future<void> expandStatusBar() async {}
+
+  @override
+  Future<bool> openAppDetails(String packageName) async => true;
+
+  @override
+  Future<bool> uninstallApp(String packageName) async => true;
+
+  @override
+  Future<bool> openClock() async => true;
+
+  @override
+  Future<bool> openCalendar() async => true;
+
+  @override
+  Future<int> getBatteryLevel() async => 85;
+
+  @override
+  Future<void> openWebSearch(String query) async {}
+
+  @override
+  Future<bool> lockScreen() async => true;
 }
 
 void main() {
