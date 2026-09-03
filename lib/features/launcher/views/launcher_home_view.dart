@@ -19,201 +19,438 @@ import '../../focus_mode/models/focus_mode_config.dart';
 import '../../scheduled_block/controllers/schedule_controller.dart';
 import '../../scheduled_block/models/schedule_config.dart';
 import '../../settings/controllers/settings_controller.dart';
+import '../../timed_access/controllers/timed_access_controller.dart';
 import '../controllers/launcher_controller.dart';
 
-class LauncherHomeView extends GetView<LauncherController> {
+class LauncherHomeView extends StatefulWidget {
   const LauncherHomeView({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+  State<LauncherHomeView> createState() => _LauncherHomeViewState();
+}
 
+class _LauncherHomeViewState extends State<LauncherHomeView> {
+  final PageController _pageController = PageController();
+  final TextEditingController _searchController = TextEditingController();
+  final RxString _searchQuery = ''.obs;
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const backgroundColor = Colors.black;
+    const textColor = AppColors.darkText;
+    const secondaryColor = AppColors.darkSecondary;
+
+    final controller = Get.find<LauncherController>();
     final appsController = Get.find<AppsController>();
     final favoritesController = Get.find<FavoritesController>();
     final productivity = Get.find<ProductivityController>();
+    final timedAccess = Get.isRegistered<TimedAccessController>()
+        ? Get.find<TimedAccessController>()
+        : null;
 
-    return Scaffold(
-      body: SafeArea(
-        child: GestureDetector(
-          onVerticalDragEnd: (details) {
-            if (details.primaryVelocity != null &&
-                details.primaryVelocity! < -400) {
-              context.push(AppRoutes.search);
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Long-press clock/date → quick menu (Screen Time / Focus Mode / Settings)
-                GestureDetector(
-                  onLongPress: () => _showClockMenu(context),
-                  child: Obx(() {
-                    final settings = Get.find<SettingsController>();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (settings.showClock.value)
-                          MinimalText(
-                            controller.currentTime.value,
-                            style: Theme.of(context)
-                                .textTheme
-                                .displayLarge
-                                ?.copyWith(color: textColor),
-                          ),
-                        if (settings.showClock.value && settings.showDate.value)
-                          const SizedBox(height: 2),
-                        if (settings.showDate.value)
-                          MinimalText(
-                            controller.currentDate.value,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: secondaryColor),
-                          ),
-                      ],
-                    );
-                  }),
+    return PopScope(
+      canPop: _currentPage == 0,
+      onPopInvoked: (didPop) {
+        if (!didPop && _pageController.hasClients && _currentPage != 0) {
+          _pageController.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: SafeArea(
+          child: PageView(
+            controller: _pageController,
+            scrollDirection: Axis.vertical,
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (index) {
+              setState(() {
+                _currentPage = index;
+              });
+            },
+            children: [
+              // ── PAGE 0: DEDICATED MINIMALIST HOME SCREEN (Black wallpaper, Clock, Favorites only) ──
+              _buildHomeScreen(
+                context: context,
+                controller: controller,
+                appsController: appsController,
+                favoritesController: favoritesController,
+                productivity: productivity,
+                timedAccess: timedAccess,
+                textColor: textColor,
+                secondaryColor: secondaryColor,
+              ),
+
+              // ── PAGE 1: ALL APPS DRAWER (Search + Complete installed apps list) ──
+              _buildAllAppsDrawer(
+                context: context,
+                appsController: appsController,
+                favoritesController: favoritesController,
+                productivity: productivity,
+                textColor: textColor,
+                secondaryColor: secondaryColor,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeScreen({
+    required BuildContext context,
+    required LauncherController controller,
+    required AppsController appsController,
+    required FavoritesController favoritesController,
+    required ProductivityController productivity,
+    required TimedAccessController? timedAccess,
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Clock & Date (Tap or Long-press opens quick menu)
+          GestureDetector(
+            onLongPress: () => _showClockMenu(context),
+            onTap: () => _showClockMenu(context),
+            child: Obx(() {
+              final settings = Get.find<SettingsController>();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (settings.showClock.value)
+                    MinimalText(
+                      controller.currentTime.value,
+                      style: Theme.of(context)
+                          .textTheme
+                          .displayLarge
+                          ?.copyWith(color: textColor),
+                    ),
+                  if (settings.showClock.value && settings.showDate.value)
+                    const SizedBox(height: 2),
+                  if (settings.showDate.value)
+                    MinimalText(
+                      controller.currentDate.value,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: secondaryColor),
+                    ),
+                ],
+              );
+            }),
+          ),
+
+          // Active Distraction Session Indicator (if any)
+          if (timedAccess != null)
+            Obx(() {
+              final session = timedAccess.currentSession.value;
+              if (session == null || session.isExpired) {
+                return const SizedBox.shrink();
+              }
+              final secs = timedAccess.remainingSeconds.value;
+              final m = secs ~/ 60;
+              final s = (secs % 60).toString().padLeft(2, '0');
+              return Container(
+                margin: const EdgeInsets.only(top: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF161616),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF262626)),
                 ),
-                const SizedBox(height: 28),
-                Container(
-                  height: 1,
-                  color: secondaryColor.withValues(alpha: 0.15),
-                ),
-                const SizedBox(height: 28),
-                Expanded(
-                  child: Obx(() {
-                    if (appsController.isLoading.value) {
-                      return Center(
-                        child: MinimalText(
-                          'Loading…',
-                          style: TextStyle(color: secondaryColor, fontSize: 16),
-                        ),
-                      );
-                    }
-
-                    if (appsController.errorMessage.isNotEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            MinimalText(
-                              appsController.errorMessage.value,
-                              style: TextStyle(
-                                  color: secondaryColor, fontSize: 16),
-                            ),
-                            const SizedBox(height: 16),
-                            GestureDetector(
-                              onTap: () => appsController.refreshApps(),
-                              child: MinimalText(
-                                'Retry',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    final favorites = favoritesController.favoriteApps;
-                    final visibleApps = appsController.apps;
-
-                    final List<AppInfo> displayList = [];
-                    final Set<String> favPackages =
-                        favorites.map((a) => a.packageName).toSet();
-
-                    displayList.addAll(favorites);
-
-                    for (final app in visibleApps) {
-                      if (!favPackages.contains(app.packageName)) {
-                        displayList.add(app);
-                      }
-                    }
-
-                    if (displayList.isEmpty) {
-                      return Center(
-                        child: MinimalText(
-                          'No apps found',
-                          style: TextStyle(color: secondaryColor, fontSize: 16),
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount:
-                          displayList.length + (favorites.isNotEmpty ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (favorites.isNotEmpty &&
-                            index == favorites.length) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: Container(
-                              height: 1,
-                              color: secondaryColor.withValues(alpha: 0.08),
-                            ),
-                          );
-                        }
-
-                        final adjustedIndex =
-                            favorites.isNotEmpty && index > favorites.length
-                                ? index - 1
-                                : index;
-
-                        if (adjustedIndex >= displayList.length) {
-                          return const SizedBox.shrink();
-                        }
-
-                        final app = displayList[adjustedIndex];
-                        final isFav = favPackages.contains(app.packageName);
-                        final name = appsController.displayName(app);
-
-                        return _AppTile(
-                          name: name,
-                          isFavorite: isFav,
-                          textColor: textColor,
-                          secondaryColor: secondaryColor,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            productivity.handleAppLaunch(app.packageName);
-                          },
-                          onLongPress: () => _showAppOptions(
-                            context,
-                            app,
-                            name,
-                            favoritesController,
-                            productivity,
-                            isFav,
-                          ),
-                        );
-                      },
-                    );
-                  }),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 4),
-                  child: Center(
-                    child: MinimalText(
-                      'Swipe up to search',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    MinimalText(
+                      '⏳ ${session.appName}: $m:$s remaining',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: secondaryColor.withValues(alpha: 0.45),
+                        fontSize: 13,
+                        color: textColor,
+                        fontWeight: FontWeight.w400,
                       ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+
+          const SizedBox(height: 28),
+          Container(
+            height: 1,
+            color: secondaryColor.withValues(alpha: 0.15),
+          ),
+          const SizedBox(height: 24),
+
+          // Favorites only on Home Screen
+          Expanded(
+            child: Obx(() {
+              final favorites = favoritesController.favoriteApps;
+
+              if (favorites.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MinimalText(
+                        'No favorite apps yet',
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      MinimalText(
+                        'Swipe up to view all apps\nLong-press an app to add to favorites',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: secondaryColor.withValues(alpha: 0.7),
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                physics: const BouncingScrollPhysics(),
+                itemCount: favorites.length,
+                itemBuilder: (context, index) {
+                  final app = favorites[index];
+                  final name = appsController.displayName(app);
+
+                  return _AppTile(
+                    name: name,
+                    isFavorite: true,
+                    textColor: textColor,
+                    secondaryColor: secondaryColor,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      productivity.handleAppLaunch(app.packageName);
+                    },
+                    onLongPress: () => _showAppOptions(
+                      context,
+                      app,
+                      name,
+                      favoritesController,
+                      productivity,
+                      true,
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+
+          // Bottom "Swipe up for all apps"
+          GestureDetector(
+            onTap: () {
+              _pageController.animateToPage(
+                1,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    MinimalText(
+                      'Swipe up for all apps',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: secondaryColor.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    MinimalText(
+                      '↑',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: secondaryColor.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllAppsDrawer({
+    required BuildContext context,
+    required AppsController appsController,
+    required FavoritesController favoritesController,
+    required ProductivityController productivity,
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drawer Header: "↓ Home" button and search field
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 14, top: 8, bottom: 8),
+                  child: MinimalText(
+                    '↓ Home',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: secondaryColor,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  cursorColor: textColor,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w400,
+                    color: textColor,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search apps…',
+                    hintStyle: TextStyle(
+                      fontSize: 18,
+                      color: secondaryColor.withValues(alpha: 0.5),
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onChanged: (val) => _searchQuery.value = val.trim(),
+                ),
+              ),
+              Obx(() {
+                if (_searchQuery.value.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return GestureDetector(
+                  onTap: () {
+                    _searchController.clear();
+                    _searchQuery.value = '';
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: MinimalText(
+                      'Clear',
+                      style: TextStyle(fontSize: 14, color: secondaryColor),
+                    ),
+                  ),
+                );
+              }),
+            ],
           ),
-        ),
+
+          const SizedBox(height: 12),
+          Container(
+            height: 1,
+            color: secondaryColor.withValues(alpha: 0.15),
+          ),
+          const SizedBox(height: 12),
+
+          // Complete list of apps
+          Expanded(
+            child: Obx(() {
+              if (appsController.isLoading.value) {
+                return Center(
+                  child: MinimalText(
+                    'Loading…',
+                    style: TextStyle(color: secondaryColor, fontSize: 16),
+                  ),
+                );
+              }
+
+              final query = _searchQuery.value.toLowerCase();
+              final allVisible = appsController.apps;
+              final favorites = favoritesController.favoriteApps;
+              final favPackages = favorites.map((a) => a.packageName).toSet();
+
+              final filtered = query.isEmpty
+                  ? allVisible
+                  : allVisible.where((app) {
+                      final name =
+                          appsController.displayName(app).toLowerCase();
+                      return name.contains(query) ||
+                          app.packageName.toLowerCase().contains(query);
+                    }).toList();
+
+              if (filtered.isEmpty) {
+                return Center(
+                  child: MinimalText(
+                    'No apps found',
+                    style: TextStyle(color: secondaryColor, fontSize: 16),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                physics: const BouncingScrollPhysics(),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final app = filtered[index];
+                  final isFav = favPackages.contains(app.packageName);
+                  final name = appsController.displayName(app);
+
+                  return _AppTile(
+                    name: name,
+                    isFavorite: isFav,
+                    textColor: textColor,
+                    secondaryColor: secondaryColor,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      productivity.handleAppLaunch(app.packageName);
+                    },
+                    onLongPress: () => _showAppOptions(
+                      context,
+                      app,
+                      name,
+                      favoritesController,
+                      productivity,
+                      isFav,
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
@@ -367,6 +604,16 @@ class LauncherHomeView extends GetView<LauncherController> {
                   color: textColor,
                   onTap: () async {
                     await Get.find<FocusModeController>().toggleBlockedApp(app.packageName);
+                    Navigator.pop(ctx);
+                  },
+                ),
+                _OptionTile(
+                  label: configService.isDistraction(app.packageName)
+                      ? 'Distraction App (on)'
+                      : 'Mark as Distraction App',
+                  color: textColor,
+                  onTap: () async {
+                    await configService.toggleDistraction(app.packageName);
                     Navigator.pop(ctx);
                   },
                 ),

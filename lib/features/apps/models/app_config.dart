@@ -4,11 +4,13 @@ class AppConfig {
   final String packageName;
   final String? customName;
   final bool isHidden;
+  final bool isDistraction;
 
   const AppConfig({
     required this.packageName,
     this.customName,
     this.isHidden = false,
+    this.isDistraction = false,
   });
 
   factory AppConfig.fromMap(Map<String, dynamic> map) {
@@ -16,6 +18,7 @@ class AppConfig {
       packageName: map['packageName'] as String? ?? '',
       customName: map['customName'] as String?,
       isHidden: map['isHidden'] as bool? ?? false,
+      isDistraction: map['isDistraction'] as bool? ?? false,
     );
   }
 
@@ -24,6 +27,7 @@ class AppConfig {
       'packageName': packageName,
       'customName': customName,
       'isHidden': isHidden,
+      'isDistraction': isDistraction,
     };
   }
 
@@ -31,12 +35,14 @@ class AppConfig {
     String? packageName,
     String? customName,
     bool? isHidden,
+    bool? isDistraction,
     bool clearCustomName = false,
   }) {
     return AppConfig(
       packageName: packageName ?? this.packageName,
       customName: clearCustomName ? null : (customName ?? this.customName),
       isHidden: isHidden ?? this.isHidden,
+      isDistraction: isDistraction ?? this.isDistraction,
     );
   }
 

@@ -79,4 +79,26 @@ class AppConfigService extends GetxService {
         .map((c) => c.packageName)
         .toList();
   }
+
+  Future<void> setDistraction(String packageName, bool isDistraction) async {
+    final current = getConfig(packageName);
+    _cache[packageName] = current.copyWith(isDistraction: isDistraction);
+    await _save();
+  }
+
+  Future<void> toggleDistraction(String packageName) async {
+    final current = getConfig(packageName);
+    await setDistraction(packageName, !current.isDistraction);
+  }
+
+  bool isDistraction(String packageName) {
+    return getConfig(packageName).isDistraction;
+  }
+
+  List<String> get distractionPackageNames {
+    return _cache.values
+        .where((c) => c.isDistraction)
+        .map((c) => c.packageName)
+        .toList();
+  }
 }

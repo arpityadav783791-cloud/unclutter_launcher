@@ -171,6 +171,12 @@ class SettingsView extends StatelessWidget {
                       subtitle: 'Long-press app → Schedule Block',
                       secondaryColor: secondaryColor,
                     ),
+                    _LinkRow(
+                      label: 'Timed Distraction Access',
+                      textColor: textColor,
+                      subtitle: 'Long-press app → Mark as Distraction App',
+                      secondaryColor: secondaryColor,
+                    ),
 
                     const SizedBox(height: 28),
                     Container(
@@ -215,6 +221,17 @@ class SettingsView extends StatelessWidget {
                     _InfoRow('Long-press app', 'Options', textColor, secondaryColor),
                     _InfoRow('Swipe up', 'Search', textColor, secondaryColor),
                     _InfoRow('Long-press clock', 'Screen Time / Focus', textColor, secondaryColor),
+
+                    // ── Protection ──────────────────────────
+                    _SectionLabel('PROTECTION', secondaryColor),
+                    const SizedBox(height: 12),
+                    _LinkRow(
+                      label: 'Protected Mode',
+                      textColor: textColor,
+                      subtitle: 'Device Owner uninstall protection',
+                      secondaryColor: secondaryColor,
+                      onTap: () => context.push(AppRoutes.protectedMode),
+                    ),
 
                     const SizedBox(height: 28),
                     Container(

@@ -51,5 +51,31 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Device Admin Receiver for Protected Mode -->
+        <receiver
+            android:name=".ProtectedDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Secret Dialer Code Recovery Receiver -->
+        <receiver
+            android:name=".ProtectedRecoveryReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <action android:name="android.telephony.action.SECRET_CODE" />
+                <data android:scheme="android_secret_code" android:host="550055" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

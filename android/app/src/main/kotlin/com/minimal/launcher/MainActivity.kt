@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
@@ -18,12 +20,24 @@ import java.util.Calendar
 class MainActivity : FlutterActivity() {
 
     private val CHANNEL = "com.minimal.launcher/native"
+    private var methodChannel: MethodChannel? = null
+    private lateinit var protectedModeManager: ProtectedModeManager
+
+    private var activeSessionPackage: String? = null
+    private var activeSessionExpiryMillis: Long = 0L
+    private val sessionHandler = Handler(Looper.getMainLooper())
+    private val sessionExpiryRunnable = Runnable {
+        enforceSessionExpiration()
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-            .setMethodCallHandler { call, result ->
+        protectedModeManager = ProtectedModeManager.getInstance(this)
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel = channel
+
+        channel.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isDefaultLauncher" -> {
                         result.success(isDefaultLauncher())
@@ -72,6 +86,41 @@ class MainActivity : FlutterActivity() {
                     }
                     "getWeeklyUsage" -> {
                         result.success(getWeeklyUsage())
+                    }
+                    // ── Timed Distraction Access ──────────────────
+                    "startTimedSession" -> {
+                        val packageName = call.argument<String>("packageName") ?: ""
+                        val durationSeconds = call.argument<Int>("durationSeconds") ?: 0
+                        startTimedSession(packageName, durationSeconds)
+                        result.success(null)
+                    }
+                    "cancelTimedSession" -> {
+                        cancelTimedSession()
+                        result.success(null)
+                    }
+                    "returnToLauncher" -> {
+                        returnToLauncher()
+                        result.success(null)
+                    }
+                    // ── Protected Mode ────────────────────────────
+                    "isDeviceOwner" -> {
+                        result.success(protectedModeManager.isDeviceOwner())
+                    }
+                    "isProtectedModeEnabled" -> {
+                        result.success(protectedModeManager.isProtectedModeEnabled())
+                    }
+                    "enableProtectedMode" -> {
+                        result.success(protectedModeManager.enableProtection())
+                    }
+                    "disableProtectedMode" -> {
+                        result.success(protectedModeManager.disableProtection())
+                    }
+                    "getProtectedModeState" -> {
+                        result.success(protectedModeManager.getState())
+                    }
+                    "requestDefaultLauncher" -> {
+                        protectedModeManager.requestDefaultLauncher()
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
@@ -294,5 +343,76 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         // Launchers should not close on back press
+    }
+
+    // ── Timed Session Enforcement ─────────────────────────────
+
+    private fun startTimedSession(packageName: String, durationSeconds: Int) {
+        sessionHandler.removeCallbacks(sessionExpiryRunnable)
+        activeSessionPackage = packageName
+        activeSessionExpiryMillis = System.currentTimeMillis() + (durationSeconds * 1000L)
+        sessionHandler.postDelayed(sessionExpiryRunnable, durationSeconds * 1000L)
+    }
+
+    private fun cancelTimedSession() {
+        sessionHandler.removeCallbacks(sessionExpiryRunnable)
+        activeSessionPackage = null
+        activeSessionExpiryMillis = 0L
+    }
+
+    private fun returnToLauncher() {
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            // fallback
+        }
+    }
+
+    private fun enforceSessionExpiration() {
+        val expiredPkg = activeSessionPackage ?: ""
+        activeSessionPackage = null
+        activeSessionExpiryMillis = 0L
+        returnToLauncher()
+        runOnUiThread {
+            methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to expiredPkg))
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("timed_session_expired", false)) {
+            val pkg = intent.getStringExtra("expired_package") ?: ""
+            runOnUiThread {
+                methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to pkg))
+            }
+        }
+        if (intent.getBooleanExtra("trigger_recovery", false)) {
+            runOnUiThread {
+                methodChannel?.invokeMethod("onRecoveryTriggered", null)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (activeSessionExpiryMillis > 0 && System.currentTimeMillis() >= activeSessionExpiryMillis) {
+            enforceSessionExpiration()
+        }
+        if (intent.getBooleanExtra("trigger_recovery", false)) {
+            intent.removeExtra("trigger_recovery")
+            runOnUiThread {
+                methodChannel?.invokeMethod("onRecoveryTriggered", null)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        sessionHandler.removeCallbacks(sessionExpiryRunnable)
+        super.onDestroy()
     }
 }

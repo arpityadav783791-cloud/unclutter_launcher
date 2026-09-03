@@ -45,6 +45,7 @@ class _SearchViewState extends State<SearchView> {
     final appsController = Get.find<AppsController>();
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
@@ -115,21 +116,10 @@ class _SearchViewState extends State<SearchView> {
               Expanded(
                 child: Obx(() {
                   final query = searchController.query.value;
-                  final results = searchController.results;
+                  final displayList =
+                      query.isEmpty ? appsController.apps : searchController.results;
 
-                  if (query.isEmpty) {
-                    return Center(
-                      child: MinimalText(
-                        'Type to search',
-                        style: TextStyle(
-                          color: secondaryColor.withValues(alpha: 0.7),
-                          fontSize: 16,
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (results.isEmpty) {
+                  if (displayList.isEmpty) {
                     return Center(
                       child: MinimalText(
                         'No apps found',

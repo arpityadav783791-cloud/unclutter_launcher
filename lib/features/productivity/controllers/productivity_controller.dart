@@ -13,10 +13,14 @@ import '../../focus_mode/views/focus_blocked_view.dart';
 import '../../scheduled_block/controllers/schedule_controller.dart';
 import '../../scheduled_block/views/schedule_blocked_view.dart';
 
+import '../../apps/services/app_config_service.dart';
+import '../../timed_access/controllers/timed_access_controller.dart';
+
 /// Central authority for every app launch decision.
 class ProductivityController extends GetxController {
   final NativeAppService _nativeAppService = Get.find<NativeAppService>();
   final AppsController _appsController = Get.find<AppsController>();
+  final AppConfigService _appConfigService = Get.find<AppConfigService>();
   final MindfulDelayService _mindfulDelayService =
       Get.find<MindfulDelayService>();
   final DailyLimitController _dailyLimitController =
@@ -25,6 +29,8 @@ class ProductivityController extends GetxController {
       Get.find<FocusModeController>();
   final ScheduleController _scheduleController =
       Get.find<ScheduleController>();
+  final TimedAccessController _timedAccessController =
+      Get.find<TimedAccessController>();
 
   Future<bool> handleAppLaunch(String packageName) async {
     if (packageName.isEmpty) return false;
@@ -54,6 +60,20 @@ class ProductivityController extends GetxController {
     // 4. Mindful Delay
     if (_mindfulDelayService.isEnabled(packageName)) {
       return _startMindfulDelay(app);
+    }
+
+    // 5. Timed Distraction Access
+    if (_appConfigService.isDistraction(packageName)) {
+      final context = Get.context;
+      if (context != null) {
+        final allowed = await _timedAccessController.handleDistractionLaunch(
+          context: context,
+          app: app,
+        );
+        if (!allowed) {
+          return false;
+        }
+      }
     }
 
     return _launch(app);
@@ -136,6 +156,16 @@ class ProductivityController extends GetxController {
       onComplete: () async {
         if (Get.context != null && Navigator.canPop(Get.context!)) {
           Navigator.pop(Get.context!);
+        }
+        if (_appConfigService.isDistraction(app.packageName)) {
+          final ctx = Get.context;
+          if (ctx != null) {
+            final allowed = await _timedAccessController.handleDistractionLaunch(
+              context: ctx,
+              app: app,
+            );
+            if (!allowed) return;
+          }
         }
         await _launch(app);
       },

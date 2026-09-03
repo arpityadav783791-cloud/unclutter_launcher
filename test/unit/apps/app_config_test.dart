@@ -37,11 +37,20 @@ void main() {
         packageName: 'com.test',
         customName: 'My App',
         isHidden: true,
+        isDistraction: true,
       );
       final restored = AppConfig.fromMap(original.toMap());
       expect(restored.packageName, 'com.test');
       expect(restored.customName, 'My App');
       expect(restored.isHidden, true);
+      expect(restored.isDistraction, true);
+    });
+
+    test('distraction flag and copyWith', () {
+      final base = AppConfig(packageName: 'com.test');
+      expect(base.isDistraction, false);
+      final updated = base.copyWith(isDistraction: true);
+      expect(updated.isDistraction, true);
     });
 
     test('copyWith clearCustomName', () {
