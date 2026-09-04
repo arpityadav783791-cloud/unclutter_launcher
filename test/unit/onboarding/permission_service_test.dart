@@ -53,6 +53,12 @@ class MockNativeBridge extends GetxService implements NativeBridge {
   Future<bool> isDefaultLauncher() async => defaultLauncher;
 
   @override
+  Future<bool> setBlackWallpaper() async => true;
+
+  @override
+  Future<bool> openDeviceSettings() async => true;
+
+  @override
   Future<void> openDefaultLauncherSettings() async {
     openedLauncherSettings = true;
   }

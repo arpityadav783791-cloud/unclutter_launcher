@@ -151,9 +151,117 @@ class SettingsController extends GetxController {
     autoLaunchSingleMatch.value = next;
   }
 
+  Future<void> cycleHomeAppsCount() async {
+    final next = (homeAppsCount.value >= 8) ? 0 : homeAppsCount.value + 1;
+    await setHomeAppsCount(next);
+  }
+
+  Future<void> cycleHomeAlignment() async {
+    final current = homeAlignment.value;
+    final next = current == 'left'
+        ? 'center'
+        : current == 'center'
+            ? 'right'
+            : 'left';
+    await setHomeAlignment(next);
+  }
+
+  Future<void> cycleDateTimeVisibility() async {
+    final current = dateTimeVisibility.value;
+    final next = current == 'on'
+        ? 'date_only'
+        : current == 'date_only'
+            ? 'off'
+            : 'on';
+    await setDateTimeVisibility(next);
+  }
+
+  Future<void> cycleThemeMode() async {
+    final current = themeMode.value;
+    final next = current == 'system'
+        ? 'dark'
+        : current == 'dark'
+            ? 'light'
+            : 'system';
+    await setThemeMode(next);
+  }
+
+  Future<void> cycleTextScale() async {
+    final current = textScale.value;
+    final next = current < 0.95
+        ? 1.0
+        : (current <= 1.05 ? 1.15 : 0.9);
+    await setTextScale(next);
+  }
+
   Future<void> setSwipeDownAction(String action) async {
     await _service.setSwipeDownAction(action);
     swipeDownAction.value = _service.settings.swipeDownAction;
+  }
+
+  Future<void> cycleSwipeDownAction() async {
+    final current = swipeDownAction.value;
+    final next = current == 'notifications' ? 'search' : 'notifications';
+    await setSwipeDownAction(next);
+  }
+
+  Future<void> cycleEInkMode() async {
+    final current = eInkMode.value;
+    final next = current == 'auto'
+        ? 'on'
+        : current == 'on'
+            ? 'off'
+            : 'auto';
+    await setEInkMode(next);
+  }
+
+  String get homeAlignmentLabel {
+    switch (homeAlignment.value) {
+      case 'center':
+        return 'Center';
+      case 'right':
+        return 'Right';
+      default:
+        return 'Left';
+    }
+  }
+
+  String get dateTimeVisibilityLabel {
+    switch (dateTimeVisibility.value) {
+      case 'date_only':
+        return 'Date only';
+      case 'off':
+        return 'Off';
+      default:
+        return 'On';
+    }
+  }
+
+  String get themeModeLabel {
+    switch (themeMode.value) {
+      case 'dark':
+        return 'Dark';
+      case 'light':
+        return 'Light';
+      default:
+        return 'System';
+    }
+  }
+
+  String get textScaleLabel {
+    if (textScale.value < 0.95) return 'Small';
+    if (textScale.value <= 1.05) return 'Normal';
+    return 'Large';
+  }
+
+  String get swipeDownActionLabel {
+    return swipeDownAction.value == 'search' ? 'Search' : 'Notifications';
+  }
+
+  String get eInkModeLabel {
+    if (eInkMode.value == 'on') return 'Always on';
+    if (eInkMode.value == 'off') return 'Off';
+    return isHardwareEink.value ? 'Auto (E-Ink)' : 'Auto';
   }
 
   Future<void> setSwipeLeftPackage(String? package) async {

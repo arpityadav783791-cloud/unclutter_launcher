@@ -82,6 +82,13 @@ class AppConfigService extends GetxService {
         .toList();
   }
 
+  List<String> get renamedPackageNames {
+    return _cache.values
+        .where((c) => c.customName != null && c.customName!.trim().isNotEmpty)
+        .map((c) => c.packageName)
+        .toList();
+  }
+
   Future<void> setDistraction(
     String packageName,
     bool isDistraction, {

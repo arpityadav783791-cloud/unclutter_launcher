@@ -38,7 +38,13 @@ class PermissionService extends GetxService {
 
   /// Checks whether Minimalist is the active default home launcher
   Future<bool> isDefaultLauncher() async {
-    return await _nativeBridge.isDefaultLauncher();
+    final isHome = await _nativeBridge.isDefaultLauncher();
+    if (isHome) {
+      try {
+        await _nativeBridge.setBlackWallpaper();
+      } catch (_) {}
+    }
+    return isHome;
   }
 
   /// Opens the Android default launcher chooser / home settings

@@ -24,6 +24,9 @@ import android.app.admin.DevicePolicyManager
 import android.net.Uri
 import android.app.WallpaperManager
 import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.content.pm.ShortcutInfo
 import android.os.BatteryManager
 import android.provider.AlarmClock
@@ -59,7 +62,11 @@ class MainActivity : FlutterActivity() {
         channel.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isDefaultLauncher" -> {
-                        result.success(isDefaultLauncher())
+                        val isDefault = isDefaultLauncher()
+                        if (isDefault) {
+                            checkAndApplyBlackWallpaperOnHome()
+                        }
+                        result.success(isDefault)
                     }
                     "openDefaultLauncherSettings" -> {
                         openDefaultLauncherSettings()
@@ -249,7 +256,10 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                     "clearWallpaper" -> {
-                        result.success(clearDeviceWallpaper())
+                        result.success(setBlackWallpaper())
+                    }
+                    "setBlackWallpaper" -> {
+                        result.success(setBlackWallpaper())
                     }
                     // ── Android 15+ Private Space Subsystem ────────
                     "isPrivateSpaceAvailable" -> {
@@ -261,6 +271,9 @@ class MainActivity : FlutterActivity() {
                     "togglePrivateSpace" -> {
                         val requestUnlock = call.argument<Boolean>("requestUnlock") ?: true
                         result.success(togglePrivateSpace(requestUnlock))
+                    }
+                    "openDeviceSettings" -> {
+                        result.success(openDeviceSettings())
                     }
                     else -> result.notImplemented()
                 }
@@ -436,6 +449,35 @@ class MainActivity : FlutterActivity() {
                     )
                 )
             }
+        }
+
+        // Guarantee device system Settings is always discoverable in drawer
+        val hasDeviceSettings = apps.any {
+            val pkg = (it["packageName"] as? String) ?: ""
+            pkg == "com.android.settings" || pkg == "android.settings"
+        }
+        if (!hasDeviceSettings) {
+            try {
+                val settingsAppInfo = pm.getApplicationInfo("com.android.settings", 0)
+                val settingsName = try {
+                    settingsAppInfo.loadLabel(pm).toString()
+                } catch (_: Exception) {
+                    "Settings"
+                }
+                apps.add(
+                    mapOf(
+                        "name" to settingsName,
+                        "packageName" to "com.android.settings",
+                        "isSystemApp" to true,
+                        "isGame" to false,
+                        "category" to -1,
+                        "installTime" to 0L,
+                        "userSerial" to 0L,
+                        "isWorkProfile" to false,
+                        "activityName" to "com.android.settings.Settings"
+                    )
+                )
+            } catch (_: Exception) {}
         }
 
         return apps.sortedBy { (it["name"] as? String)?.lowercase() ?: "" }
@@ -863,16 +905,49 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun clearDeviceWallpaper(): Boolean {
+    private fun setBlackWallpaper(): Boolean {
         return try {
             val wm = WallpaperManager.getInstance(this)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                wm.clear(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+            val dm = resources.displayMetrics
+            val width = if (dm.widthPixels > 0) dm.widthPixels else 1080
+            val height = if (dm.heightPixels > 0) dm.heightPixels else 1920
+
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.BLACK)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                wm.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
             } else {
-                wm.clear()
+                wm.setBitmap(bitmap)
             }
+            bitmap.recycle()
             true
         } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun clearDeviceWallpaper(): Boolean {
+        return setBlackWallpaper()
+    }
+
+    private fun checkAndApplyBlackWallpaperOnHome(): Boolean {
+        return try {
+            if (isDefaultLauncher()) {
+                val prefs = getSharedPreferences("unclutter_prefs", Context.MODE_PRIVATE)
+                val alreadyApplied = prefs.getBoolean("black_wallpaper_set_on_home", false)
+                if (!alreadyApplied) {
+                    val success = setBlackWallpaper()
+                    if (success) {
+                        prefs.edit().putBoolean("black_wallpaper_set_on_home", true).apply()
+                    }
+                    return success
+                }
+            }
+            false
+        } catch (_: Exception) {
             false
         }
     }
@@ -927,8 +1002,45 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun openDeviceSettings(): Boolean {
+        return try {
+            val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val fallbackIntent = Intent().apply {
+                    component = ComponentName("com.android.settings", "com.android.settings.Settings")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(fallbackIntent)
+                true
+            } catch (e2: Exception) {
+                try {
+                    val pkgIntent = packageManager.getLaunchIntentForPackage("com.android.settings")
+                    if (pkgIntent != null) {
+                        pkgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(pkgIntent)
+                        true
+                    } else {
+                        false
+                    }
+                } catch (e3: Exception) {
+                    false
+                }
+            }
+        }
+    }
+
     private fun launchApp(packageName: String, userSerial: Long? = null, activityName: String? = null): Boolean {
         return try {
+            // Direct handling for device system settings (ensures reliability across OEMs like Motorola / Samsung)
+            if (packageName == "com.android.settings" || packageName == "android.settings" || packageName.endsWith(".settings")) {
+                return openDeviceSettings()
+            }
+
             val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
             val userManager = getSystemService(Context.USER_SERVICE) as? UserManager
             val myUserHandle = Process.myUserHandle()
@@ -949,6 +1061,19 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
+            // Direct Component launch if activityName is known
+            if (!activityName.isNullOrBlank()) {
+                try {
+                    val compIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_LAUNCHER)
+                        component = ComponentName(packageName, activityName)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(compIntent)
+                    return true
+                } catch (_: Exception) {}
+            }
+
             // Standard / main user launch
             val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
@@ -961,13 +1086,25 @@ class MainActivity : FlutterActivity() {
                     launcherApps.startMainActivity(component, myUserHandle, null, null)
                     true
                 } else {
+                    if (packageName.contains("settings", ignoreCase = true)) {
+                        openDeviceSettings()
+                    } else {
+                        false
+                    }
+                }
+            } else {
+                if (packageName.contains("settings", ignoreCase = true)) {
+                    openDeviceSettings()
+                } else {
                     false
                 }
+            }
+        } catch (e: Exception) {
+            if (packageName.contains("settings", ignoreCase = true)) {
+                openDeviceSettings()
             } else {
                 false
             }
-        } catch (e: Exception) {
-            false
         }
     }
 
@@ -1288,6 +1425,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        checkAndApplyBlackWallpaperOnHome()
         if (activeSessionExpiryMillis > 0 && System.currentTimeMillis() >= activeSessionExpiryMillis) {
             enforceSessionExpiration()
         }

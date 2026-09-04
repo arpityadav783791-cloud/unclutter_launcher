@@ -84,6 +84,11 @@ class FavoritesController extends GetxController {
     rebuildFavorites();
   }
 
+  Future<void> reorderFavorite(String packageName, int targetIndex) async {
+    await _favoritesService.reorder(packageName, targetIndex);
+    rebuildFavorites();
+  }
+
   @override
   void onClose() {
     _appsWorker?.dispose();

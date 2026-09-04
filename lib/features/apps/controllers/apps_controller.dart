@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 import '../../../core/services/native_bridge.dart';
+import '../../../core/routes/app_routes.dart';
+import '../../../core/routes/app_router.dart';
 import '../models/app_info.dart';
 import '../models/pinned_shortcut.dart';
 import '../services/native_app_service.dart';
@@ -52,7 +54,16 @@ class AppsController extends GetxController {
 
     try {
       final result = await _nativeAppService.getInstalledApps();
-      allApps.assignAll(result);
+      final appList = List<AppInfo>.from(result);
+      if (!appList.any((a) => a.packageName == 'com.minimal.launcher.settings')) {
+        appList.add(const AppInfo(
+          name: 'Settings(unclutter)',
+          packageName: 'com.minimal.launcher.settings',
+          isSystemApp: true,
+        ));
+      }
+      appList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      allApps.assignAll(appList);
       await _configService.autoDetectDistractions(result);
       _applyVisibility();
       _hasLoaded = true;
@@ -103,6 +114,17 @@ class AppsController extends GetxController {
     int? userSerial,
     String? activityName,
   }) async {
+    if (packageName == 'com.minimal.launcher.settings' ||
+        packageName == 'com.minimal.launcher') {
+      AppRouter.router.push(AppRoutes.settings);
+      return true;
+    }
+    if (packageName == 'com.android.settings' ||
+        packageName == 'android.settings') {
+      if (Get.isRegistered<NativeBridge>()) {
+        return await Get.find<NativeBridge>().openDeviceSettings();
+      }
+    }
     return await _nativeAppService.launchApp(
       packageName,
       userSerial: userSerial,

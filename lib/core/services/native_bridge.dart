@@ -464,6 +464,16 @@ class NativeBridge extends GetxService {
     }
   }
 
+  /// Sets pure black wallpaper for distraction-free minimalist experience
+  Future<bool> setBlackWallpaper() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('setBlackWallpaper');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   // ── Android 15+ Private Space Subsystem ─────────────────────
 
   /// Checks if a Private Space profile exists on Android 15+ (API 35+)
@@ -493,6 +503,16 @@ class NativeBridge extends GetxService {
         'togglePrivateSpace',
         {'requestUnlock': requestUnlock},
       );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens native Android device settings (Settings app)
+  Future<bool> openDeviceSettings() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('openDeviceSettings');
       return result ?? false;
     } on PlatformException {
       return false;

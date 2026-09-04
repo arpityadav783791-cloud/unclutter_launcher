@@ -16,11 +16,14 @@ import '../../scheduled_block/views/schedule_blocked_view.dart';
 import '../../apps/services/app_config_service.dart';
 import '../../timed_access/controllers/timed_access_controller.dart';
 
+import '../../../core/routes/app_routes.dart';
+import '../../../core/routes/app_router.dart';
+import '../../../core/services/native_bridge.dart';
+
 /// Central authority for every app launch decision.
 class ProductivityController extends GetxController {
   final NativeAppService _nativeAppService = Get.find<NativeAppService>();
   final AppsController _appsController = Get.find<AppsController>();
-  final AppConfigService _appConfigService = Get.find<AppConfigService>();
   final MindfulDelayService _mindfulDelayService =
       Get.find<MindfulDelayService>();
   final DailyLimitController _dailyLimitController =
@@ -29,15 +32,39 @@ class ProductivityController extends GetxController {
       Get.find<FocusModeController>();
   final ScheduleController _scheduleController =
       Get.find<ScheduleController>();
+  final AppConfigService _appConfigService = Get.find<AppConfigService>();
   final TimedAccessController _timedAccessController =
       Get.find<TimedAccessController>();
 
+  /// Main entry point for launching an app.
+  /// Runs all enabled productivity interventions in priority order:
+  /// 1. Focus Mode (hard block)
+  /// 2. Scheduled Block (time-of-day block)
+  /// 3. Daily Limit (usage cap reached)
+  /// 4. Mindful Delay (friction timer)
+  /// 5. Timed Distraction Access (session allowance check)
+  /// 6. Direct Launch (if no restrictions apply or timed session active)
   Future<bool> handleAppLaunch(
     String packageName, {
     int userSerial = 0,
     String? activityName,
   }) async {
     if (packageName.isEmpty) return false;
+
+    // Direct navigation to Launcher Settings if selected
+    if (packageName == 'com.minimal.launcher.settings' ||
+        packageName == 'com.minimal.launcher') {
+      AppRouter.router.push(AppRoutes.settings);
+      return true;
+    }
+
+    // Direct opening of Android Device Settings
+    if (packageName == 'com.android.settings' ||
+        packageName == 'android.settings') {
+      if (Get.isRegistered<NativeBridge>()) {
+        return await Get.find<NativeBridge>().openDeviceSettings();
+      }
+    }
 
     final app = _appsController.findApp(packageName, userSerial: userSerial);
     if (app == null) {
@@ -190,11 +217,19 @@ class ProductivityController extends GetxController {
   }
 
   Future<bool> _launch(AppInfo app) async {
-    final success = await _nativeAppService.launchApp(
+    bool success = await _nativeAppService.launchApp(
       app.packageName,
       userSerial: app.userSerial,
       activityName: app.activityName,
     );
+    if (!success &&
+        (app.packageName == 'com.android.settings' ||
+            app.packageName.contains('settings') ||
+            app.name.toLowerCase() == 'settings')) {
+      if (Get.isRegistered<NativeBridge>()) {
+        success = await Get.find<NativeBridge>().openDeviceSettings();
+      }
+    }
     if (!success) {
       _showMessage('Could not open ${app.name}');
     }

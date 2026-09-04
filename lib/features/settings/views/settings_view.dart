@@ -1,16 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/routes/app_routes.dart';
+import '../../../core/services/native_bridge.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/minimal_text.dart';
-import '../../../core/routes/app_routes.dart';
-import '../../../core/services/permission_service.dart';
+import '../../apps/controllers/apps_controller.dart';
+import '../../apps/services/app_config_service.dart';
 import '../../onboarding/services/onboarding_service.dart';
 import '../controllers/settings_controller.dart';
-import '../services/daily_wallpaper_service.dart';
+import '../widgets/gesture_app_picker_sheet.dart';
+import '../widgets/unclutter_feature_sheets.dart';
 
-class SettingsView extends StatelessWidget {
+class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
+
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<SettingsView> {
+  final RxBool isDefaultLauncher = false.obs;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDefaultLauncher();
+  }
+
+  Future<void> _checkDefaultLauncher() async {
+    if (Get.isRegistered<PermissionService>()) {
+      final isDef = await Get.find<PermissionService>().isDefaultLauncher();
+      isDefaultLauncher.value = isDef;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +45,11 @@ class SettingsView extends StatelessWidget {
         isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
 
     final controller = Get.find<SettingsController>();
+    final appsController =
+        Get.isRegistered<AppsController>() ? Get.find<AppsController>() : null;
+    final configService = Get.isRegistered<AppConfigService>()
+        ? Get.find<AppConfigService>()
+        : null;
 
     return Scaffold(
       body: SafeArea(
@@ -35,9 +65,7 @@ class SettingsView extends StatelessWidget {
                   style: TextStyle(fontSize: 15, color: secondaryColor),
                 ),
               ),
-
-              const SizedBox(height: 28),
-
+              const SizedBox(height: 24),
               MinimalText(
                 'Settings',
                 style: TextStyle(
@@ -46,476 +74,351 @@ class SettingsView extends StatelessWidget {
                   color: textColor,
                 ),
               ),
-
-              const SizedBox(height: 32),
-
+              const SizedBox(height: 28),
               Expanded(
                 child: ListView(
                   physics: const BouncingScrollPhysics(),
                   children: [
-                    // ── Appearance ───────────────────────────
-                    _SectionLabel('APPEARANCE & TYPOGRAPHY', secondaryColor),
-                    const SizedBox(height: 12),
-
-                    Obx(() => _ToggleRow(
-                          label: 'Show status bar',
-                          value: controller.showStatusBar.value,
-                          textColor: textColor,
-                          onTap: controller.toggleStatusBar,
-                        )),
-                    Obx(() => _ToggleRow(
-                          label: 'Bold font',
-                          value: controller.boldFont.value,
-                          textColor: textColor,
-                          onTap: controller.toggleBoldFont,
-                        )),
-                    Obx(() => _ToggleRow(
-                          label: 'Show clock',
-                          value: controller.showClock.value,
-                          textColor: textColor,
-                          onTap: controller.toggleClock,
-                        )),
-                    Obx(() => _ToggleRow(
-                          label: 'Show date',
-                          value: controller.showDate.value,
-                          textColor: textColor,
-                          onTap: controller.toggleDate,
-                        )),
-
-                    const SizedBox(height: 12),
-                    MinimalText(
-                      'Date & time visibility',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 8),
+                    // ── Default Launcher ─────────────────────
+                    _SectionLabel('DEFAULT LAUNCHER', secondaryColor),
+                    const SizedBox(height: 6),
                     Obx(() {
-                      final v = controller.dateTimeVisibility.value;
-                      return Column(
-                        children: [
-                          _SelectRow(
-                            label: 'Clock & Date',
-                            selected: v == 'on',
-                            textColor: textColor,
-                            onTap: () => controller.setDateTimeVisibility('on'),
-                          ),
-                          _SelectRow(
-                            label: 'Date only',
-                            selected: v == 'date_only',
-                            textColor: textColor,
-                            onTap: () =>
-                                controller.setDateTimeVisibility('date_only'),
-                          ),
-                          _SelectRow(
-                            label: 'Hidden',
-                            selected: v == 'off',
-                            textColor: textColor,
-                            onTap: () =>
-                                controller.setDateTimeVisibility('off'),
-                          ),
-                        ],
+                      final isDefault = isDefaultLauncher.value;
+                      return _OlauncherSettingTile(
+                        title: 'Default launcher',
+                        subtitle: isDefault
+                            ? 'Unclutter is your default home'
+                            : 'Tap to make Unclutter your default home',
+                        value: isDefault ? 'Active ✓' : 'Set default →',
+                        textColor: textColor,
+                        secondaryColor: secondaryColor,
+                        onTap: () async {
+                          if (Get.isRegistered<PermissionService>()) {
+                            await Get.find<PermissionService>()
+                                .openDefaultLauncherSettings();
+                            await Future.delayed(
+                                const Duration(milliseconds: 600));
+                            await _checkDefaultLauncher();
+                          }
+                        },
                       );
                     }),
 
-                    const SizedBox(height: 12),
-                    MinimalText(
-                      'Theme',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 8),
-                    Obx(() {
-                      final mode = controller.themeMode.value;
-                      return Column(
-                        children: [
-                          _SelectRow(
-                            label: 'System',
-                            selected: mode == 'system',
-                            textColor: textColor,
-                            onTap: () => controller.setThemeMode('system'),
-                          ),
-                          _SelectRow(
-                            label: 'Light',
-                            selected: mode == 'light',
-                            textColor: textColor,
-                            onTap: () => controller.setThemeMode('light'),
-                          ),
-                          _SelectRow(
-                            label: 'Dark',
-                            selected: mode == 'dark',
-                            textColor: textColor,
-                            onTap: () => controller.setThemeMode('dark'),
-                          ),
-                        ],
-                      );
-                    }),
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
 
-                    const SizedBox(height: 12),
-                    MinimalText(
-                      'E-Ink display mode',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 8),
-                    Obx(() {
-                      final eInk = controller.eInkMode.value;
-                      final isHw = controller.isHardwareEink.value;
-                      return Column(
-                        children: [
-                          _SelectRow(
-                            label: isHw ? 'Auto (E-Ink detected)' : 'Auto',
-                            selected: eInk == 'auto',
-                            textColor: textColor,
-                            onTap: () => controller.setEInkMode('auto'),
-                          ),
-                          _SelectRow(
-                            label: 'Always on (monochrome, zero animations)',
-                            selected: eInk == 'on',
-                            textColor: textColor,
-                            onTap: () => controller.setEInkMode('on'),
-                          ),
-                          _SelectRow(
-                            label: 'Off',
-                            selected: eInk == 'off',
-                            textColor: textColor,
-                            onTap: () => controller.setEInkMode('off'),
-                          ),
-                        ],
-                      );
-                    }),
-
-                    const SizedBox(height: 12),
-                    MinimalText(
-                      'Text size',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 8),
-                    Obx(() {
-                      final scale = controller.textScale.value;
-                      return Column(
-                        children: [
-                          _SelectRow(
-                            label: 'Small',
-                            selected: scale < 0.95,
-                            textColor: textColor,
-                            onTap: () => controller.setTextScale(0.9),
-                          ),
-                          _SelectRow(
-                            label: 'Normal',
-                            selected: scale >= 0.95 && scale <= 1.05,
-                            textColor: textColor,
-                            onTap: () => controller.setTextScale(1.0),
-                          ),
-                          _SelectRow(
-                            label: 'Large',
-                            selected: scale > 1.05,
-                            textColor: textColor,
-                            onTap: () => controller.setTextScale(1.15),
-                          ),
-                        ],
-                      );
-                    }),
-
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // ── Home Customization ───────────────────
+                    // ── Home Screen ──────────────────────────
                     _SectionLabel('HOME SCREEN', secondaryColor),
-                    const SizedBox(height: 12),
-
-                    MinimalText(
-                      'Alignment',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 8),
-                    Obx(() {
-                      final align = controller.homeAlignment.value;
-                      return Column(
-                        children: [
-                          _SelectRow(
-                            label: 'Left',
-                            selected: align == 'left',
-                            textColor: textColor,
-                            onTap: () => controller.setHomeAlignment('left'),
-                          ),
-                          _SelectRow(
-                            label: 'Center',
-                            selected: align == 'center',
-                            textColor: textColor,
-                            onTap: () => controller.setHomeAlignment('center'),
-                          ),
-                          _SelectRow(
-                            label: 'Right',
-                            selected: align == 'right',
-                            textColor: textColor,
-                            onTap: () => controller.setHomeAlignment('right'),
-                          ),
-                        ],
-                      );
-                    }),
-
-                    const SizedBox(height: 8),
-                    Obx(() => _ToggleRow(
-                          label: 'Bottom alignment',
-                          value: controller.homeBottomAlignment.value,
+                    const SizedBox(height: 6),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Home screen apps',
+                          subtitle: controller.homeAppsCount.value == 0
+                              ? 'Hidden from home'
+                              : '${controller.homeAppsCount.value} apps on home',
+                          value: '${controller.homeAppsCount.value}',
                           textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleHomeAppsCount,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Home alignment',
+                          value: controller.homeAlignmentLabel,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleHomeAlignment,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Bottom alignment',
+                          subtitle: 'Align home apps at the bottom',
+                          isToggle: true,
+                          toggleValue: controller.homeBottomAlignment.value,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
                           onTap: controller.toggleHomeBottomAlignment,
                         )),
-
-                    const SizedBox(height: 12),
-                    Obx(() {
-                      final count = controller.homeAppsCount.value;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          MinimalText(
-                            'Home apps count: $count',
-                            style: TextStyle(fontSize: 16, color: textColor),
-                          ),
-                          Slider(
-                            value: count.toDouble(),
-                            min: 0,
-                            max: 8,
-                            divisions: 8,
-                            activeColor: textColor,
-                            inactiveColor:
-                                secondaryColor.withValues(alpha: 0.2),
-                            onChanged: (val) =>
-                                controller.setHomeAppsCount(val.toInt()),
-                          ),
-                        ],
-                      );
-                    }),
-                    const SizedBox(height: 8),
-                    Obx(() => _ToggleRow(
-                          label: 'Show screen time on home',
-                          value: controller.showScreenTime.value,
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Date & time',
+                          value: controller.dateTimeVisibilityLabel,
                           textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleDateTimeVisibility,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Show screen time on home',
+                          isToggle: true,
+                          toggleValue: controller.showScreenTime.value,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
                           onTap: controller.toggleShowScreenTime,
                         )),
-                    const SizedBox(height: 8),
-                    Obx(() {
-                      final enabled = controller.dailyWallpaperEnabled.value;
-                      return Column(
-                        children: [
-                          _ToggleRow(
-                            label: 'Daily curated wallpaper',
-                            value: enabled,
-                            textColor: textColor,
-                            onTap: () async {
-                              await controller.toggleDailyWallpaper();
-                              if (controller.dailyWallpaperEnabled.value &&
-                                  Get.isRegistered<DailyWallpaperService>()) {
-                                Get.find<DailyWallpaperService>()
-                                    .updateDailyWallpaper(isDark: isDark);
-                              }
-                            },
-                          ),
-                          if (enabled)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  left: 16, top: 4, bottom: 8),
-                              child: Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      if (Get.isRegistered<
-                                          DailyWallpaperService>()) {
-                                        Get.find<DailyWallpaperService>()
-                                            .updateDailyWallpaper(
-                                          isDark: isDark,
-                                          force: true,
-                                        );
-                                      }
-                                    },
-                                    child: MinimalText(
-                                      'Refresh wallpaper',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: secondaryColor,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  GestureDetector(
-                                    onTap: () {
-                                      if (Get.isRegistered<
-                                          DailyWallpaperService>()) {
-                                        Get.find<DailyWallpaperService>()
-                                            .resetWallpaper();
-                                      }
-                                    },
-                                    child: MinimalText(
-                                      'Reset to black',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: secondaryColor,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      );
-                    }),
-
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
+                    _OlauncherSettingTile(
+                      title: 'Favorite apps',
+                      subtitle: 'Choose & reorder apps on home screen',
+                      value: 'Manage →',
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                      onTap: () => showFavoritesManagerSheet(context),
                     ),
-                    const SizedBox(height: 28),
+
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
+
+                    // ── Appearance & Typography ───────────────
+                    _SectionLabel('APPEARANCE & TYPOGRAPHY', secondaryColor),
+                    const SizedBox(height: 6),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Theme',
+                          value: controller.themeModeLabel,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleThemeMode,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Text size',
+                          value: controller.textScaleLabel,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleTextScale,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Bold font',
+                          isToggle: true,
+                          toggleValue: controller.boldFont.value,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.toggleBoldFont,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Show status bar',
+                          isToggle: true,
+                          toggleValue: controller.showStatusBar.value,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.toggleStatusBar,
+                        )),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'E-Ink display mode',
+                          subtitle: 'High contrast monochrome with no animations',
+                          value: controller.eInkModeLabel,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleEInkMode,
+                        )),
+
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
 
                     // ── Gestures ─────────────────────────────
                     _SectionLabel('GESTURES', secondaryColor),
-                    const SizedBox(height: 12),
-
-                    MinimalText(
-                      'Swipe down action',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Swipe down',
+                          subtitle: 'Swipe down on home screen',
+                          value: controller.swipeDownActionLabel,
+                          textColor: textColor,
+                          secondaryColor: secondaryColor,
+                          onTap: controller.cycleSwipeDownAction,
+                        )),
                     Obx(() {
-                      final action = controller.swipeDownAction.value;
-                      return Column(
-                        children: [
-                          _SelectRow(
-                            label: 'Notifications',
-                            selected: action == 'notifications',
-                            textColor: textColor,
-                            onTap: () =>
-                                controller.setSwipeDownAction('notifications'),
-                          ),
-                          _SelectRow(
-                            label: 'Search',
-                            selected: action == 'search',
-                            textColor: textColor,
-                            onTap: () => controller.setSwipeDownAction('search'),
-                          ),
-                        ],
+                      final pkg = controller.swipeLeftPackage.value;
+                      String appName = 'Camera';
+                      if (pkg != null &&
+                          pkg.isNotEmpty &&
+                          appsController != null) {
+                        final found = appsController.apps
+                            .firstWhereOrNull((a) => a.packageName == pkg);
+                        if (found != null) {
+                          appName = appsController.displayName(found);
+                        }
+                      }
+                      return _OlauncherSettingTile(
+                        title: 'Swipe left',
+                        subtitle: 'Quick swipe left on home screen',
+                        value: '$appName →',
+                        textColor: textColor,
+                        secondaryColor: secondaryColor,
+                        onTap: () => showGestureAppPickerSheet(
+                          context,
+                          isLeft: true,
+                        ),
                       );
                     }),
-
-                    const SizedBox(height: 8),
-                    Obx(() => _ToggleRow(
-                          label: 'Double tap to lock screen',
-                          value: controller.doubleTapToLock.value,
+                    Obx(() {
+                      final pkg = controller.swipeRightPackage.value;
+                      String appName = 'Phone';
+                      if (pkg != null &&
+                          pkg.isNotEmpty &&
+                          appsController != null) {
+                        final found = appsController.apps
+                            .firstWhereOrNull((a) => a.packageName == pkg);
+                        if (found != null) {
+                          appName = appsController.displayName(found);
+                        }
+                      }
+                      return _OlauncherSettingTile(
+                        title: 'Swipe right',
+                        subtitle: 'Quick swipe right on home screen',
+                        value: '$appName →',
+                        textColor: textColor,
+                        secondaryColor: secondaryColor,
+                        onTap: () => showGestureAppPickerSheet(
+                          context,
+                          isLeft: false,
+                        ),
+                      );
+                    }),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Double tap to lock screen',
+                          subtitle: 'Locks screen instantly on home double tap',
+                          isToggle: true,
+                          toggleValue: controller.doubleTapToLock.value,
                           textColor: textColor,
+                          secondaryColor: secondaryColor,
                           onTap: controller.toggleDoubleTapToLock,
                         )),
 
-                    _InfoRow('Swipe left', 'Camera (or configured)', textColor,
-                        secondaryColor),
-                    _InfoRow('Swipe right', 'Phone (or configured)', textColor,
-                        secondaryColor),
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
 
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // ── Search & Drawer ──────────────────────
+                    // ── App Drawer & Search ──────────────────
                     _SectionLabel('SEARCH & APP DRAWER', secondaryColor),
-                    const SizedBox(height: 12),
-
-                    Obx(() => _ToggleRow(
-                          label: 'Auto-show keyboard',
-                          value: controller.autoShowKeyboard.value,
+                    const SizedBox(height: 6),
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Auto-show keyboard',
+                          subtitle: 'Open keyboard when entering app drawer',
+                          isToggle: true,
+                          toggleValue: controller.autoShowKeyboard.value,
                           textColor: textColor,
+                          secondaryColor: secondaryColor,
                           onTap: controller.toggleAutoShowKeyboard,
                         )),
-                    Obx(() => _ToggleRow(
-                          label: 'Auto-launch single match',
-                          value: controller.autoLaunchSingleMatch.value,
+                    Obx(() => _OlauncherSettingTile(
+                          title: 'Auto-launch single match',
+                          subtitle: 'Instantly opens when only 1 app matches search',
+                          isToggle: true,
+                          toggleValue: controller.autoLaunchSingleMatch.value,
                           textColor: textColor,
+                          secondaryColor: secondaryColor,
                           onTap: controller.toggleAutoLaunchSingleMatch,
                         )),
-                    _InfoRow('!query', 'DuckDuckGo Bang search', textColor,
-                        secondaryColor),
-                    _InfoRow(
-                        '0 matches', 'Web search fallback', textColor, secondaryColor),
-                    _InfoRow(' ✦ badge', 'Newly installed (< 24h)', textColor,
-                        secondaryColor),
-
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // ── Productivity ─────────────────────────
-                    _SectionLabel('PRODUCTIVITY', secondaryColor),
-                    const SizedBox(height: 12),
-
-                    _LinkRow(
-                      label: 'Screen Time',
+                    _OlauncherSettingTile(
+                      title: 'Hidden apps',
+                      subtitle: configService != null
+                          ? '${configService.hiddenPackageNames.length} apps hidden'
+                          : 'View and unhide hidden applications',
+                      value: 'Manage →',
                       textColor: textColor,
+                      secondaryColor: secondaryColor,
+                      onTap: () => showHiddenAppsManagerSheet(context),
+                    ),
+                    _OlauncherSettingTile(
+                      title: 'Renamed apps',
+                      subtitle: configService != null
+                          ? '${configService.renamedPackageNames.length} apps custom labeled'
+                          : 'Manage custom labels and aliases',
+                      value: 'Manage →',
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                      onTap: () => showRenamedAppsManagerSheet(context),
+                    ),
+
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
+
+                    // ── Productivity & Digital Wellbeing ─────
+                    _SectionLabel('DIGITAL WELLBEING', secondaryColor),
+                    const SizedBox(height: 6),
+                    _OlauncherSettingTile(
+                      title: 'Screen time stats',
+                      subtitle: 'Daily usage stats & app breakdown',
+                      value: 'View stats →',
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
                       onTap: () => context.push(AppRoutes.screenTime),
                     ),
-                    _LinkRow(
-                      label: 'Focus Mode',
+                    _OlauncherSettingTile(
+                      title: 'Mindful delay',
+                      subtitle: 'Configure breathing pauses before opening apps',
+                      value: 'Configure →',
                       textColor: textColor,
-                      subtitle: 'Long-press clock to start/stop',
                       secondaryColor: secondaryColor,
+                      onTap: () => showMindfulDelaySettingsSheet(context),
                     ),
-                    _LinkRow(
-                      label: 'Mindful Delay',
+                    _OlauncherSettingTile(
+                      title: 'Daily limits',
+                      subtitle: 'Configure daily usage limits per app',
+                      value: 'Configure →',
                       textColor: textColor,
-                      subtitle: 'Long-press app → Mindful Delay',
                       secondaryColor: secondaryColor,
+                      onTap: () => showDailyLimitsSettingsSheet(context),
                     ),
-                    _LinkRow(
-                      label: 'Daily Limits',
+                    _OlauncherSettingTile(
+                      title: 'Scheduled blocking',
+                      subtitle: 'Configure quiet hour block rules per app',
+                      value: 'Configure →',
                       textColor: textColor,
-                      subtitle: 'Long-press app → Daily Limit',
                       secondaryColor: secondaryColor,
+                      onTap: () => showScheduleBlockSettingsSheet(context),
                     ),
-                    _LinkRow(
-                      label: 'Scheduled Blocking',
+                    _OlauncherSettingTile(
+                      title: 'Focus mode',
+                      subtitle: 'Long-press clock on home screen to activate',
+                      value: 'Info',
                       textColor: textColor,
-                      subtitle: 'Long-press app → Schedule Block',
-                      secondaryColor: secondaryColor,
-                    ),
-                    _LinkRow(
-                      label: 'Timed Distraction Access',
-                      textColor: textColor,
-                      subtitle: 'Long-press app → Mark as Distraction App',
-                      secondaryColor: secondaryColor,
-                    ),
-
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // ── System & Protection ──────────────────
-                    _SectionLabel('SYSTEM & PROTECTION', secondaryColor),
-                    const SizedBox(height: 12),
-                    _LinkRow(
-                      label: 'Default Launcher',
-                      textColor: textColor,
-                      subtitle: 'Set Minimalist as home screen',
                       secondaryColor: secondaryColor,
                       onTap: () {
-                        if (Get.isRegistered<PermissionService>()) {
-                          Get.find<PermissionService>()
-                              .openDefaultLauncherSettings();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const MinimalText(
+                              'Tip: Long-press the clock on home screen to toggle Focus Mode.',
+                            ),
+                            duration: const Duration(seconds: 3),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: isDark
+                                ? const Color(0xFF222222)
+                                : const Color(0xFFEEEEEE),
+                          ),
+                        );
+                      },
+                    ),
+                    _OlauncherSettingTile(
+                      title: 'Protected mode',
+                      subtitle: 'Device Owner uninstall & bypass protection',
+                      value: 'Configure →',
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                      onTap: () => context.push(AppRoutes.protectedMode),
+                    ),
+
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
+
+                    // ── System & Onboarding ──────────────────
+                    _SectionLabel('SYSTEM', secondaryColor),
+                    const SizedBox(height: 6),
+                    _OlauncherSettingTile(
+                      title: 'Device settings',
+                      subtitle: 'Open Android system settings',
+                      value: 'Open →',
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                      onTap: () {
+                        if (Get.isRegistered<NativeBridge>()) {
+                          Get.find<NativeBridge>().openDeviceSettings();
                         }
                       },
                     ),
-                    _LinkRow(
-                      label: 'Digital Detox Onboarding',
+                    _OlauncherSettingTile(
+                      title: 'Digital detox onboarding',
+                      subtitle: 'Review initial setup and permissions',
+                      value: 'Reset & view →',
                       textColor: textColor,
-                      subtitle: 'Review setup and permissions',
                       secondaryColor: secondaryColor,
                       onTap: () async {
                         if (Get.isRegistered<OnboardingService>()) {
@@ -526,36 +429,21 @@ class SettingsView extends StatelessWidget {
                         }
                       },
                     ),
-                    _LinkRow(
-                      label: 'Protected Mode',
-                      textColor: textColor,
-                      subtitle: 'Device Owner uninstall protection',
-                      secondaryColor: secondaryColor,
-                      onTap: () => context.push(AppRoutes.protectedMode),
-                    ),
 
-                    const SizedBox(height: 28),
-                    Container(
-                      height: 1,
-                      color: secondaryColor.withValues(alpha: 0.12),
-                    ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
+                    _Divider(secondaryColor),
+                    const SizedBox(height: 20),
 
                     // ── About ────────────────────────────────
                     _SectionLabel('ABOUT', secondaryColor),
-                    const SizedBox(height: 12),
-                    MinimalText(
-                      'Minimal Launcher',
-                      style: TextStyle(fontSize: 16, color: textColor),
-                    ),
-                    const SizedBox(height: 4),
-                    MinimalText(
-                      'Text-first. Distraction-free.\nBuilt for intentional phone use.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: secondaryColor,
-                        height: 1.4,
-                      ),
+                    const SizedBox(height: 8),
+                    _OlauncherSettingTile(
+                      title: 'Unclutter Launcher',
+                      subtitle: 'Minimalist. Distraction-free. Open Source.\nBuilt for intentional phone use.',
+                      value: 'v1.0.0',
+                      textColor: textColor,
+                      secondaryColor: secondaryColor,
+                      onTap: () {},
                     ),
 
                     const SizedBox(height: 48),
@@ -590,175 +478,101 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ToggleRow extends StatelessWidget {
-  final String label;
-  final bool value;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  const _ToggleRow({
-    required this.label,
-    required this.value,
-    required this.textColor,
-    required this.onTap,
-  });
+class _Divider extends StatelessWidget {
+  final Color color;
+  const _Divider(this.color);
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            MinimalText(
-              label,
-              style: TextStyle(fontSize: 16, color: textColor),
-            ),
-            MinimalText(
-              value ? 'On' : 'Off',
-              style: TextStyle(
-                fontSize: 14,
-                color: value ? AppColors.accent : textColor.withValues(alpha: 0.4),
-                fontWeight: value ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Container(
+      height: 1,
+      color: color.withValues(alpha: 0.1),
     );
   }
 }
 
-class _SelectRow extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  const _SelectRow({
-    required this.label,
-    required this.selected,
-    required this.textColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            MinimalText(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                color: selected ? textColor : textColor.withValues(alpha: 0.4),
-                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
-              ),
-            ),
-            if (selected)
-              const MinimalText(
-                '✓',
-                style: TextStyle(fontSize: 14, color: AppColors.accent),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LinkRow extends StatelessWidget {
-  final String label;
-  final Color textColor;
+class _OlauncherSettingTile extends StatelessWidget {
+  final String title;
   final String? subtitle;
-  final Color? secondaryColor;
-  final VoidCallback? onTap;
-
-  const _LinkRow({
-    required this.label,
-    required this.textColor,
-    this.subtitle,
-    this.secondaryColor,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MinimalText(
-                  label,
-                  style: TextStyle(fontSize: 16, color: textColor),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  MinimalText(
-                    subtitle!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: secondaryColor?.withValues(alpha: 0.5) ??
-                          textColor.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if (onTap != null)
-              MinimalText(
-                '→',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: textColor.withValues(alpha: 0.4),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
+  final String? value;
+  final VoidCallback onTap;
   final Color textColor;
   final Color secondaryColor;
+  final bool isToggle;
+  final bool? toggleValue;
 
-  const _InfoRow(this.label, this.value, this.textColor, this.secondaryColor);
+  const _OlauncherSettingTile({
+    required this.title,
+    this.subtitle,
+    this.value,
+    required this.onTap,
+    required this.textColor,
+    required this.secondaryColor,
+    this.isToggle = false,
+    this.toggleValue,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          MinimalText(
-            label,
-            style: TextStyle(fontSize: 15, color: textColor),
-          ),
-          MinimalText(
-            value,
-            style: TextStyle(fontSize: 14, color: secondaryColor),
-          ),
-        ],
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  MinimalText(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: textColor,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    MinimalText(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: secondaryColor.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            if (isToggle && toggleValue != null)
+              MinimalText(
+                toggleValue! ? 'On' : 'Off',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: toggleValue!
+                      ? AppColors.accent
+                      : secondaryColor.withValues(alpha: 0.45),
+                ),
+              )
+            else if (value != null)
+              MinimalText(
+                value!,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: secondaryColor,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

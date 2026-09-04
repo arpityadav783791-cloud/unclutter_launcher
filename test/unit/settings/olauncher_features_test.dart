@@ -1,6 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
+import 'package:minimal_launcher/core/services/storage_service.dart';
 import 'package:minimal_launcher/features/apps/models/app_info.dart';
+import 'package:minimal_launcher/features/settings/controllers/settings_controller.dart';
 import 'package:minimal_launcher/features/settings/models/launcher_settings.dart';
+import 'package:minimal_launcher/features/settings/services/settings_service.dart';
+import '../../helpers/test_helpers.dart';
 
 void main() {
   group('Olauncher Features - LauncherSettings', () {
@@ -130,6 +135,89 @@ void main() {
       expect(restored.installTime, 123456789);
       expect(restored.isGame, isTrue);
       expect(restored.category, 0);
+    });
+  });
+
+  group('Olauncher Settings Controller Cycles & Labels', () {
+    test('SettingsController cycle and label methods work correctly', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      Get.reset();
+      await setupTestStorage();
+      await Get.putAsync(() => StorageService().init());
+      Get.put<SettingsService>(SettingsService());
+      final controller = Get.put<SettingsController>(SettingsController());
+
+      // Home apps count cycle: 4 -> 5 -> ... -> 8 -> 0
+      expect(controller.homeAppsCount.value, 4);
+      await controller.cycleHomeAppsCount();
+      expect(controller.homeAppsCount.value, 5);
+      await controller.setHomeAppsCount(8);
+      await controller.cycleHomeAppsCount();
+      expect(controller.homeAppsCount.value, 0);
+
+      // Alignment cycle: left -> center -> right -> left
+      expect(controller.homeAlignmentLabel, 'Left');
+      await controller.cycleHomeAlignment();
+      expect(controller.homeAlignment.value, 'center');
+      expect(controller.homeAlignmentLabel, 'Center');
+      await controller.cycleHomeAlignment();
+      expect(controller.homeAlignment.value, 'right');
+      expect(controller.homeAlignmentLabel, 'Right');
+      await controller.cycleHomeAlignment();
+      expect(controller.homeAlignment.value, 'left');
+
+      // Date & Time visibility cycle: on -> date_only -> off -> on
+      expect(controller.dateTimeVisibilityLabel, 'On');
+      await controller.cycleDateTimeVisibility();
+      expect(controller.dateTimeVisibility.value, 'date_only');
+      expect(controller.dateTimeVisibilityLabel, 'Date only');
+      await controller.cycleDateTimeVisibility();
+      expect(controller.dateTimeVisibility.value, 'off');
+      expect(controller.dateTimeVisibilityLabel, 'Off');
+      await controller.cycleDateTimeVisibility();
+      expect(controller.dateTimeVisibility.value, 'on');
+
+      // Theme mode cycle: system -> dark -> light -> system
+      expect(controller.themeModeLabel, 'System');
+      await controller.cycleThemeMode();
+      expect(controller.themeMode.value, 'dark');
+      expect(controller.themeModeLabel, 'Dark');
+      await controller.cycleThemeMode();
+      expect(controller.themeMode.value, 'light');
+      expect(controller.themeModeLabel, 'Light');
+      await controller.cycleThemeMode();
+      expect(controller.themeMode.value, 'system');
+
+      // Text scale cycle: 1.0 (Normal) -> 1.15 (Large) -> 0.9 (Small) -> 1.0 (Normal)
+      expect(controller.textScaleLabel, 'Normal');
+      await controller.cycleTextScale();
+      expect(controller.textScaleLabel, 'Large');
+      await controller.cycleTextScale();
+      expect(controller.textScaleLabel, 'Small');
+      await controller.cycleTextScale();
+      expect(controller.textScaleLabel, 'Normal');
+
+      // Swipe down action cycle: notifications -> search -> notifications
+      expect(controller.swipeDownActionLabel, 'Notifications');
+      await controller.cycleSwipeDownAction();
+      expect(controller.swipeDownActionLabel, 'Search');
+      await controller.cycleSwipeDownAction();
+      expect(controller.swipeDownActionLabel, 'Notifications');
+
+      // E-Ink mode cycle: auto -> on -> off -> auto
+      expect(controller.eInkModeLabel, 'Auto');
+      await controller.cycleEInkMode();
+      expect(controller.eInkMode.value, 'on');
+      expect(controller.eInkModeLabel, 'Always on');
+      await controller.cycleEInkMode();
+      expect(controller.eInkMode.value, 'off');
+      expect(controller.eInkModeLabel, 'Off');
+      await controller.cycleEInkMode();
+      expect(controller.eInkMode.value, 'auto');
+
+      Get.delete<SettingsController>();
+      Get.delete<SettingsService>();
+      Get.delete<StorageService>();
     });
   });
 }

@@ -139,102 +139,109 @@ void showAppOptionsBottomSheet({
                   },
                 ),
               ],
-              OptionTile(
-                label: 'Rename',
-                color: textColor,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  showAppRenameDialog(
-                    context: context,
-                    app: app,
-                    currentDisplayName: displayName,
-                    configService: configService,
-                    appsController: appsController,
-                  );
-                },
-              ),
-              OptionTile(
-                label: hasDelay ? 'Mindful Delay (on)' : 'Mindful Delay',
-                color: textColor,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showMindfulDelayOptions(context, app, displayName, delayController);
-                },
-              ),
-              OptionTile(
-                label: Get.find<DailyLimitController>().isEnabledFor(app.packageName)
-                    ? 'Daily Limit (on)'
-                    : 'Daily Limit',
-                color: textColor,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showDailyLimitOptions(context, app, displayName);
-                },
-              ),
-              OptionTile(
-                label: Get.find<ScheduleController>().isEnabledFor(app.packageName)
-                    ? 'Schedule Block (on)'
-                    : 'Schedule Block',
-                color: textColor,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showScheduleOptions(context, app, displayName);
-                },
-              ),
-              OptionTile(
-                label: Get.find<FocusModeController>().isAppInBlockList(app.packageName)
-                    ? 'Remove from Focus block list'
-                    : 'Add to Focus block list',
-                color: textColor,
-                onTap: () async {
-                  await Get.find<FocusModeController>().toggleBlockedApp(app.packageName);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-              ),
-              OptionTile(
-                label: configService.isDistraction(app.packageName)
-                    ? 'Distraction App (on)'
-                    : 'Mark as Distraction App',
-                color: textColor,
-                onTap: () async {
-                  await configService.toggleDistraction(app.packageName);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-              ),
-              OptionTile(
-                label: 'App Info',
-                color: textColor,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  if (Get.isRegistered<NativeBridge>()) {
-                    Get.find<NativeBridge>().openAppDetails(app.packageName);
-                  }
-                },
-              ),
-              if (!app.isSystemApp)
+              if (app.packageName != 'com.minimal.launcher.settings') ...[
                 OptionTile(
-                  label: 'Uninstall',
-                  color: Colors.redAccent,
+                  label: 'Rename',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    showAppRenameDialog(
+                      context: context,
+                      app: app,
+                      currentDisplayName: displayName,
+                      configService: configService,
+                      appsController: appsController,
+                    );
+                  },
+                ),
+                OptionTile(
+                  label: hasDelay ? 'Mindful Delay (on)' : 'Mindful Delay',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showMindfulDelayOptions(
+                        context, app, displayName, delayController);
+                  },
+                ),
+                OptionTile(
+                  label: Get.find<DailyLimitController>()
+                          .isEnabledFor(app.packageName)
+                      ? 'Daily Limit (on)'
+                      : 'Daily Limit',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showDailyLimitOptions(context, app, displayName);
+                  },
+                ),
+                OptionTile(
+                  label: Get.find<ScheduleController>()
+                          .isEnabledFor(app.packageName)
+                      ? 'Schedule Block (on)'
+                      : 'Schedule Block',
+                  color: textColor,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showScheduleOptions(context, app, displayName);
+                  },
+                ),
+                OptionTile(
+                  label: Get.find<FocusModeController>()
+                          .isAppInBlockList(app.packageName)
+                      ? 'Remove from Focus block list'
+                      : 'Add to Focus block list',
+                  color: textColor,
+                  onTap: () async {
+                    await Get.find<FocusModeController>()
+                        .toggleBlockedApp(app.packageName);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                ),
+                OptionTile(
+                  label: configService.isDistraction(app.packageName)
+                      ? 'Distraction App (on)'
+                      : 'Mark as Distraction App',
+                  color: textColor,
+                  onTap: () async {
+                    await configService.toggleDistraction(app.packageName);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                ),
+                OptionTile(
+                  label: 'App Info',
+                  color: textColor,
                   onTap: () {
                     Navigator.pop(ctx);
                     if (Get.isRegistered<NativeBridge>()) {
-                      Get.find<NativeBridge>().uninstallApp(app.packageName);
+                      Get.find<NativeBridge>().openAppDetails(app.packageName);
                     }
                   },
                 ),
-              OptionTile(
-                label: 'Hide',
-                color: textColor,
-                onTap: () async {
-                  await configService.setHidden(app.packageName, true);
-                  if (isFavorite) {
-                    await favoritesController.removeFavorite(app.packageName);
-                  }
-                  appsController.refreshVisibility();
-                  favoritesController.rebuildFavorites();
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-              ),
+                if (!app.isSystemApp)
+                  OptionTile(
+                    label: 'Uninstall',
+                    color: Colors.redAccent,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (Get.isRegistered<NativeBridge>()) {
+                        Get.find<NativeBridge>().uninstallApp(app.packageName);
+                      }
+                    },
+                  ),
+                OptionTile(
+                  label: 'Hide',
+                  color: textColor,
+                  onTap: () async {
+                    await configService.setHidden(app.packageName, true);
+                    if (isFavorite) {
+                      await favoritesController.removeFavorite(app.packageName);
+                    }
+                    appsController.refreshVisibility();
+                    favoritesController.rebuildFavorites();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                ),
+              ],
             ],
           ),
         ),

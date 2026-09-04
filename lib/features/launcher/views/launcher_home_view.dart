@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/services/native_bridge.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/minimal_text.dart';
 import '../../apps/controllers/apps_controller.dart';
@@ -26,7 +27,8 @@ class LauncherHomeView extends StatefulWidget {
   State<LauncherHomeView> createState() => _LauncherHomeViewState();
 }
 
-class _LauncherHomeViewState extends State<LauncherHomeView> {
+class _LauncherHomeViewState extends State<LauncherHomeView>
+    with WidgetsBindingObserver {
   final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
   final RxString _searchQuery = ''.obs;
@@ -35,10 +37,31 @@ class _LauncherHomeViewState extends State<LauncherHomeView> {
   DateTime? _lastSwipeDownTime;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkDefaultLauncherAndSetBlackWallpaper();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkDefaultLauncherAndSetBlackWallpaper();
+    }
+  }
+
+  Future<void> _checkDefaultLauncherAndSetBlackWallpaper() async {
+    if (Get.isRegistered<PermissionService>()) {
+      await Get.find<PermissionService>().isDefaultLauncher();
+    }
   }
 
   @override

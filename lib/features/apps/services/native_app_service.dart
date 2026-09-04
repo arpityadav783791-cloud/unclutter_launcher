@@ -68,8 +68,23 @@ class NativeAppService extends GetxService {
             'activityName': activityName,
         },
       );
+      if (result == true) return true;
+      if (packageName == 'com.android.settings' ||
+          packageName == 'android.settings' ||
+          packageName.endsWith('.settings')) {
+        final opened = await _channel.invokeMethod<bool>('openDeviceSettings');
+        if (opened == true) return true;
+      }
       return result ?? false;
     } on PlatformException {
+      if (packageName == 'com.android.settings' ||
+          packageName == 'android.settings' ||
+          packageName.endsWith('.settings')) {
+        try {
+          final opened = await _channel.invokeMethod<bool>('openDeviceSettings');
+          if (opened == true) return true;
+        } catch (_) {}
+      }
       return false;
     }
   }
