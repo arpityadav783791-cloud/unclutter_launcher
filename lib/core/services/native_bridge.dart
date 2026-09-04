@@ -14,6 +14,7 @@ class NativeBridge extends GetxService {
   void Function(String packageName)? onDistractionIntercepted;
   void Function(String packageName, int durationMinutes)? onSessionExtended;
   void Function(String packageName)? onBlockAppRequested;
+  void Function()? onHomePressed;
 
   @override
   void onInit() {
@@ -22,6 +23,10 @@ class NativeBridge extends GetxService {
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
+    if (call.method == 'onHomePressed') {
+      onHomePressed?.call();
+      return true;
+    }
     if (call.method == 'onSessionExpired') {
       final args = call.arguments as Map<dynamic, dynamic>?;
       final packageName = args?['packageName'] as String? ?? '';

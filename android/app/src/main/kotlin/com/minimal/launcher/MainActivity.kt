@@ -33,6 +33,8 @@ import android.provider.AlarmClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import android.view.KeyEvent
+import android.util.Log
 import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -1634,7 +1636,44 @@ class MainActivity : FlutterActivity() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             startActivity(intent)
+            runOnUiThread {
+                methodChannel?.invokeMethod("onHomePressed", null)
+            }
         } catch (_: Exception) {}
+    }
+
+    fun pauseMediaPlayback() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+            // 1. Dispatch media pause & stop key events
+            val pauseDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE)
+            val pauseUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE)
+            audioManager.dispatchMediaKeyEvent(pauseDown)
+            audioManager.dispatchMediaKeyEvent(pauseUp)
+
+            val stopDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_STOP)
+            val stopUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_STOP)
+            audioManager.dispatchMediaKeyEvent(stopDown)
+            audioManager.dispatchMediaKeyEvent(stopUp)
+
+            // 2. Request transient audio focus gain to force YouTube/media to stop playing
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    .build()
+                audioManager.requestAudioFocus(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "pauseMediaPlayback error: ${e.message}")
+        }
     }
 
     private fun enforceSessionExpiration() {
@@ -1651,46 +1690,42 @@ class MainActivity : FlutterActivity() {
         activeSessionExpiryMillis = 0L
 
         // Active native enforcement & Picture-in-Picture prevention:
-        // 1. Steal audio focus to immediately pause video/audio playback in YouTube/media apps.
-        // Pausing media prevents Android from automatically entering PiP on home navigation.
-        try {
-            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    .build()
-                audioManager?.requestAudioFocus(focusRequest)
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager?.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-            }
-        } catch (_: Exception) {}
+        // 1. Pause media playback and steal audio focus
+        pauseMediaPlayback()
 
-        // 2. Accessibility enforcement: lock package, dismiss any active PiP, press Back then Home
+        // 2. Accessibility enforcement: lock package, press Back (closes YouTube player), then go Home
         if (expiredPkg.isNotEmpty()) {
             MyAccessibilityService.setExpiredPackage(expiredPkg)
-            MyAccessibilityService.dismissPipIfActive(expiredPkg)
             MyAccessibilityService.pressBack()
         }
         MyAccessibilityService.goHome()
 
-        // 3. Terminate background processes for the target distraction package to eliminate PiP floating window
+        // 3. Dismiss any active PiP
+        if (expiredPkg.isNotEmpty()) {
+            MyAccessibilityService.dismissPipIfActive(expiredPkg)
+        }
+
+        // 4. Terminate background processes for the target distraction package
         if (expiredPkg.isNotEmpty()) {
             try {
                 val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                 am?.killBackgroundProcesses(expiredPkg)
             } catch (_: Exception) {}
+
+            try {
+                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+                val admin = ComponentName(this, ProtectedDeviceAdminReceiver::class.java)
+                if (dpm != null && dpm.isDeviceOwnerApp(packageName)) {
+                    dpm.setApplicationHidden(admin, expiredPkg, true)
+                    dpm.setApplicationHidden(admin, expiredPkg, false)
+                }
+            } catch (_: Exception) {}
         }
 
-        // 4. Return to launcher
+        // 5. Return to launcher
         returnToLauncher()
 
-        // 5. Post-check after 350ms to kill any asynchronously spawned PiP windows
+        // 6. Post-check after 250ms and 500ms to dismiss any asynchronously spawned PiP windows
         if (expiredPkg.isNotEmpty()) {
             Handler(Looper.getMainLooper()).postDelayed({
                 MyAccessibilityService.dismissPipIfActive(expiredPkg)
@@ -1698,7 +1733,10 @@ class MainActivity : FlutterActivity() {
                     val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                     am?.killBackgroundProcesses(expiredPkg)
                 } catch (_: Exception) {}
-            }, 350L)
+            }, 250L)
+            Handler(Looper.getMainLooper()).postDelayed({
+                MyAccessibilityService.dismissPipIfActive(expiredPkg)
+            }, 500L)
         }
 
         runOnUiThread {
@@ -1745,6 +1783,14 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+
+        val isHomeAction = (Intent.ACTION_MAIN == intent.action && intent.hasCategory(Intent.CATEGORY_HOME)) ||
+                           (intent.flags and Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED != 0)
+        if (isHomeAction) {
+            runOnUiThread {
+                methodChannel?.invokeMethod("onHomePressed", null)
+            }
+        }
         if (intent.hasExtra("intercepted_distraction_package")) {
             val pkg = intent.getStringExtra("intercepted_distraction_package") ?: ""
             intent.removeExtra("intercepted_distraction_package")

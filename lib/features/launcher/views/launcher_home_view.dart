@@ -46,11 +46,43 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkDefaultLauncherAndSetBlackWallpaper();
+    if (Get.isRegistered<NativeBridge>()) {
+      Get.find<NativeBridge>().onHomePressed = _returnToHomeScreen;
+    }
+  }
+
+  void _returnToHomeScreen() {
+    if (!mounted) return;
+    if (_pageController.hasClients && _currentPage != 0) {
+      _searchFocusNode.unfocus();
+      _searchController.clear();
+      _searchQuery.value = '';
+      if (Get.isRegistered<AppSearchController>()) {
+        Get.find<AppSearchController>().clear();
+      }
+      _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    } else if (_appsScrollController.hasClients && _appsScrollController.offset > 0) {
+      _appsScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Get.isRegistered<NativeBridge>()) {
+      final bridge = Get.find<NativeBridge>();
+      if (bridge.onHomePressed == _returnToHomeScreen) {
+        bridge.onHomePressed = null;
+      }
+    }
     _pageController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();

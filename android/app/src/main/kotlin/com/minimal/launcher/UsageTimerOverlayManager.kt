@@ -542,8 +542,9 @@ object UsageTimerOverlayManager {
             setOnKeyListener { _, keyCode, event ->
                 if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
                     Log.d(TAG, "Back key pressed on expired overlay: terminating $targetPackage")
-                    stopSession()
+                    MainActivity.instance?.pauseMediaPlayback()
                     MainActivity.instance?.terminateTargetApp(targetPackage)
+                    stopSession()
                     true
                 } else {
                     false
@@ -677,8 +678,9 @@ object UsageTimerOverlayManager {
             setOnClickListener {
                 // COMPLETELY TERMINATE TARGET APP & RETURN TO UNCLUTTER
                 Log.d(TAG, "TAKE ME OUT OF HERE pressed: terminating $targetPackage")
-                stopSession()
+                MainActivity.instance?.pauseMediaPlayback()
                 MainActivity.instance?.terminateTargetApp(targetPackage)
+                stopSession()
             }
         }
         row1.addView(btnTakeMeOut)
@@ -710,9 +712,10 @@ object UsageTimerOverlayManager {
             )
             setOnClickListener {
                 Log.d(TAG, "Block app pressed for $targetPackage")
-                stopSession()
+                MainActivity.instance?.pauseMediaPlayback()
                 MainActivity.instance?.blockDistractionApp(targetPackage)
                 MainActivity.instance?.terminateTargetApp(targetPackage)
+                stopSession()
             }
         }
         card.addView(btnBlock)

@@ -63,13 +63,17 @@ class MyAccessibilityService : AccessibilityService() {
                                 val pkg = root.packageName?.toString() ?: ""
                                 if (packageName.isNullOrEmpty() || pkg == packageName) {
                                     root.performAction(AccessibilityNodeInfo.ACTION_DISMISS)
-                                    val closeNodes = root.findAccessibilityNodeInfosByViewId("com.android.systemui:id/close")
-                                    for (node in closeNodes) {
-                                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                                    }
-                                    val dismissNodes = root.findAccessibilityNodeInfosByViewId("com.android.systemui:id/dismiss")
-                                    for (node in dismissNodes) {
-                                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                                    val closeIds = listOf(
+                                        "com.android.systemui:id/close",
+                                        "com.android.systemui:id/dismiss",
+                                        "com.google.android.youtube:id/close_button",
+                                        "com.google.android.youtube:id/player_close_button"
+                                    )
+                                    for (id in closeIds) {
+                                        val nodes = root.findAccessibilityNodeInfosByViewId(id)
+                                        for (node in nodes) {
+                                            node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                                        }
                                     }
                                     service.performGlobalAction(GLOBAL_ACTION_BACK)
                                 }
