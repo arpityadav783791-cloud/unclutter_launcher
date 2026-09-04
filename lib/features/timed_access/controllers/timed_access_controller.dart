@@ -43,9 +43,24 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
       );
     }
 
-    // Wire up native callback
+    // Wire up native callback when timer runs out
     _nativeBridge.onSessionExpired = (packageName) {
-      handleSessionExpired(expiredPackage: packageName);
+      _countdownTicker?.cancel();
+      final session = currentSession.value ?? _service.activeSession ?? _lastExpiredSession;
+      final pkg = packageName.isNotEmpty ? packageName : (session?.packageName ?? '');
+      final name = session?.appName ?? pkg;
+      _lastExpiredSession = session ??
+          TimedAppSession.create(
+            packageName: pkg,
+            appName: name,
+            durationMinutes: 0,
+          );
+      currentSession.value = null;
+      remainingSeconds.value = 0;
+      isExpired.value = true;
+      _service.clearSession();
+      // Native expired overlay card is displayed over the distraction app.
+      // User can tap [Extend] or [TAKE ME OUT OF HERE] there.
     };
 
     // Wire up native callback when user taps [Extend] in the overlay
@@ -122,7 +137,7 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     if (session == null) return;
 
     if (session.isExpired) {
-      handleSessionExpired(expiredPackage: session.packageName);
+      handleSessionExpired(expiredPackage: session.packageName, showSheet: true);
     } else {
       currentSession.value = session;
       remainingSeconds.value = session.remainingSeconds;
@@ -147,6 +162,7 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
         _countdownTicker?.cancel();
         remainingSeconds.value = 0;
         isExpired.value = true;
+        handleSessionExpired(expiredPackage: session.packageName, showSheet: true);
       }
     });
   }
@@ -291,7 +307,9 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
 
     // Show "Your time is up. Need more time?" sheet only if requested
     if (showSheet) {
-      _showExpiredSheet(packageName: pkg, appName: name);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showExpiredSheet(packageName: pkg, appName: name);
+      });
     }
   }
 

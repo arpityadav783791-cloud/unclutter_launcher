@@ -9,14 +9,12 @@ class MinimalLauncherApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // SettingsController may not be ready on first frame
     final settingsController = Get.isRegistered<SettingsController>()
         ? Get.find<SettingsController>()
         : null;
 
     return Obx(() {
       final themeMode = settingsController?.flutterThemeMode ?? ThemeMode.system;
-      final textScale = settingsController?.textScale.value ?? 1.0;
 
       return GetMaterialApp.router(
         title: 'Minimal Launcher',
@@ -28,12 +26,19 @@ class MinimalLauncherApp extends StatelessWidget {
         routeInformationParser: AppRouter.router.routeInformationParser,
         routeInformationProvider: AppRouter.router.routeInformationProvider,
         builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(textScale),
-            ),
-            child: child ?? const SizedBox.shrink(),
-          );
+          if (settingsController == null) {
+            return child ?? const SizedBox.shrink();
+          }
+
+          return Obx(() {
+            final scale = settingsController.textScale.value;
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale.clamp(0.85, 1.25)),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          });
         },
       );
     });

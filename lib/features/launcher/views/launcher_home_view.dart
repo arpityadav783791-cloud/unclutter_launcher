@@ -7,6 +7,8 @@ import '../../../core/services/native_bridge.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/minimal_text.dart';
 import '../../apps/controllers/apps_controller.dart';
 import '../../favorites/controllers/favorites_controller.dart';
@@ -153,6 +155,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                   _searchFocusNode.unfocus();
                   _searchController.clear();
                   _searchQuery.value = '';
+                  searchController.clear();
                 }
               },
               children: [
@@ -245,7 +248,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF161616),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: AppRadius.borderSm,
                     border: Border.all(color: const Color(0xFF262626)),
                   ),
                   child: Row(
@@ -371,6 +374,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                   ),
                   onChanged: (val) {
                     _searchQuery.value = val;
+                    searchController.onQueryChanged(val);
                     final settings = Get.find<SettingsController>();
                     if (settings.autoLaunchSingleMatch.value) {
                       final trimmed = val.trim();
@@ -431,6 +435,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                   onTap: () {
                     _searchController.clear();
                     _searchQuery.value = '';
+                    searchController.clear();
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(8),
@@ -560,7 +565,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                           onTap: () {
                             if (Get.isRegistered<NativeBridge>()) {
                               Get.find<NativeBridge>()
-                                   .openWebSearch(query.trim());
+                                  .openWebSearch(query.trim());
                             }
                           },
                           child: MinimalText(
@@ -578,6 +583,9 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                 );
               }
 
+              final settings = Get.find<SettingsController>();
+              final isBold = settings.boldFont.value;
+
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -586,8 +594,8 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                       controller: _appsScrollController,
                       physics: const BouncingScrollPhysics(),
                       // ignore: deprecated_member_use
-                      cacheExtent: 10000.0,
-                      addAutomaticKeepAlives: true,
+                      cacheExtent: 350.0,
+                      addAutomaticKeepAlives: false,
                       addRepaintBoundaries: true,
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
@@ -596,10 +604,12 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                         final name = appsController.displayName(app);
 
                         return _AppTile(
+                          key: ValueKey('${app.packageName}_${app.userSerial}'),
                           name: name,
                           isFavorite: isFav,
                           isRecentInstall: app.isRecentInstall,
                           isWorkProfile: app.isWorkProfile,
+                          isBold: isBold,
                           textColor: textColor,
                           secondaryColor: secondaryColor,
                           onTap: () {
@@ -630,7 +640,7 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                         final idx = filtered.indexWhere((app) =>
                             appsController.displayName(app).toUpperCase().startsWith(letter));
                         if (idx != -1 && _appsScrollController.hasClients) {
-                          final target = (idx * 50.0).clamp(
+                          final target = (idx * 48.0).clamp(
                             0.0,
                             _appsScrollController.position.maxScrollExtent,
                           );
@@ -706,16 +716,19 @@ class _AppTile extends StatelessWidget {
   final bool isFavorite;
   final bool isRecentInstall;
   final bool isWorkProfile;
+  final bool isBold;
   final Color textColor;
   final Color secondaryColor;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
   const _AppTile({
+    super.key,
     required this.name,
     required this.isFavorite,
     this.isRecentInstall = false,
     this.isWorkProfile = false,
+    this.isBold = false,
     required this.textColor,
     required this.secondaryColor,
     required this.onTap,
@@ -724,11 +737,6 @@ class _AppTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = Get.isRegistered<SettingsController>()
-        ? Get.find<SettingsController>()
-        : null;
-    final isBold = settings?.boldFont.value ?? false;
-    final scale = settings?.textScale.value ?? 1.0;
     final workBadge = isWorkProfile ? ' 💼' : '';
     final recentBadge = isRecentInstall ? ' ✦' : '';
     final badge = '$workBadge$recentBadge';
@@ -736,27 +744,23 @@ class _AppTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: AppRadius.borderXs,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 13),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
             Expanded(
               child: MinimalText(
                 '$name$badge',
-                style: TextStyle(
-                  fontSize: 20 * scale,
-                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
+                style: (isBold ? AppTypography.appTitleBold : AppTypography.appTitle).copyWith(
                   color: textColor,
-                  letterSpacing: 0.15,
                 ),
               ),
             ),
             if (isFavorite)
               MinimalText(
                 '★',
-                style: TextStyle(
-                  fontSize: 13 * scale,
+                style: AppTypography.favoriteStar.copyWith(
                   color: secondaryColor.withValues(alpha: 0.5),
                 ),
               ),

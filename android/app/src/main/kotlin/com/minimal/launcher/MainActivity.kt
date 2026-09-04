@@ -65,7 +65,7 @@ class MainActivity : FlutterActivity() {
     private var sessionExpiryPendingIntent: PendingIntent? = null
     private val sessionHandler = Handler(Looper.getMainLooper())
     private val sessionExpiryRunnable = Runnable {
-        UsageTimerOverlayManager.showExpiredCard()
+        enforceSessionExpiration()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -1733,6 +1733,12 @@ class MainActivity : FlutterActivity() {
     fun blockDistractionApp(packageName: String) {
         runOnUiThread {
             methodChannel?.invokeMethod("onBlockAppRequested", mapOf("packageName" to packageName))
+        }
+    }
+
+    fun notifySessionExpired(packageName: String) {
+        runOnUiThread {
+            methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to packageName))
         }
     }
 

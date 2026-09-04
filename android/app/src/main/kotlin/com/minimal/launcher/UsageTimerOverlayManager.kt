@@ -71,7 +71,7 @@ object UsageTimerOverlayManager {
         override fun run() {
             updateTimerState()
             if (activePackage != null) {
-                updateHandler.postDelayed(this, 500L)
+                updateHandler.postDelayed(this, 1000L)
             }
         }
     }
@@ -109,11 +109,8 @@ object UsageTimerOverlayManager {
 
     fun showExpiredCard() {
         val target = activePackage ?: return
-        if (!isExpiredDialogShowing) {
-            updateHandler.post {
-                showExpiredCardOnApp(target)
-            }
-        }
+        if (isExpiredDialogShowing) return
+        showExpiredCardOnApp(target)
     }
 
     fun extendSession(minutes: Int) {
@@ -487,9 +484,13 @@ object UsageTimerOverlayManager {
         }
 
         // ── In-place Expiration Trigger ───────────────────────────
-        if (now >= expiresAtMillis && !isExpiredDialogShowing) {
-            Log.d(TAG, "Session expired for $target. Showing in-place modal overlay card on top of app.")
-            showExpiredCardOnApp(target)
+        if (now >= expiresAtMillis) {
+            if (!isExpiredDialogShowing) {
+                Log.d(TAG, "Session expired for $target. Showing expired card on app.")
+                showExpiredCardOnApp(target)
+                MainActivity.instance?.notifySessionExpired(target)
+            }
+            return
         }
     }
 

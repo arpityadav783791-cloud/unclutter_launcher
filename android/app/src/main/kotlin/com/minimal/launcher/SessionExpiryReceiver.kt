@@ -40,9 +40,12 @@ class SessionExpiryReceiver : BroadcastReceiver() {
 
         when (action) {
             ACTION_SESSION_EXPIRED -> {
-                // Do NOT terminate distraction app!
-                // App stays running, and UsageTimerOverlayManager displays the modal overlay card on top.
-                UsageTimerOverlayManager.showExpiredCard()
+                if (UsageTimerOverlayManager.isSessionOpenFor(packageName)) {
+                    UsageTimerOverlayManager.showExpiredCard()
+                } else {
+                    terminateDistractionApp(context, packageName)
+                }
+                MainActivity.instance?.notifySessionExpired(packageName)
             }
             ACTION_END_SESSION -> {
                 // User explicitly clicked "End Session" in notification

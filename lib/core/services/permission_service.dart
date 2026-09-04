@@ -96,4 +96,99 @@ class PermissionService extends GetxService {
   Future<void> requestOverlayPermission() async {
     await _nativeBridge.requestOverlayPermission();
   }
+
+  /// Returns diagnostic permission items with human-friendly status and rationales
+  Future<List<PermissionDiagnostic>> getPermissionDiagnostics() async {
+    final defaultLauncher = await isDefaultLauncher();
+    final usageAccess = await checkUsageAccess();
+    final notifRequired = await isNotificationPermissionRequired();
+    final notification = notifRequired ? await checkNotificationPermission() : true;
+    final accessibility = await checkAccessibilityPermission();
+    final enfRequired = await isEnforcementPermissionRequired();
+    final enforcement = enfRequired ? await checkEnforcementPermission() : true;
+    final owner = await isDeviceOwner();
+
+    return [
+      PermissionDiagnostic(
+        id: 'default_launcher',
+        title: 'Default Launcher',
+        description: defaultLauncher ? '✓ Enabled' : '⚠ Needs setup',
+        rationale: 'Required to make Unclutter your primary home screen.',
+        isGranted: defaultLauncher,
+        isRequired: true,
+        onAction: openDefaultLauncherSettings,
+      ),
+      PermissionDiagnostic(
+        id: 'usage_access',
+        title: 'Usage Access',
+        description: usageAccess ? '✓ Enabled' : '⚠ Needs setup',
+        rationale: 'Required for screen time insights and enforcing daily app limits.',
+        isGranted: usageAccess,
+        isRequired: true,
+        onAction: openUsageAccessSettings,
+      ),
+      PermissionDiagnostic(
+        id: 'notification',
+        title: 'Notifications',
+        description: notification ? '✓ Enabled' : '⚠ Needs setup',
+        rationale: 'Required for timed access countdowns and expiration notices.',
+        isGranted: notification,
+        isRequired: notifRequired,
+        onAction: openNotificationSettings,
+      ),
+      PermissionDiagnostic(
+        id: 'accessibility',
+        title: 'Accessibility Service',
+        description: accessibility ? '✓ Enabled' : '⚠ Needs setup',
+        rationale: 'Required for the double-tap to lock screen gesture.',
+        isGranted: accessibility,
+        isRequired: false,
+        onAction: openAccessibilitySettings,
+      ),
+      if (enfRequired)
+        PermissionDiagnostic(
+          id: 'enforcement',
+          title: 'Overlay Enforcement',
+          description: enforcement ? '✓ Enabled' : '⚠ Needs setup',
+          rationale: 'Required on your Android version to reliably block distracting apps.',
+          isGranted: enforcement,
+          isRequired: true,
+          onAction: openEnforcementSettings,
+        ),
+      PermissionDiagnostic(
+        id: 'tamper_protection',
+        title: 'Tamper Protection',
+        description: owner ? '✓ Protected' : 'Inactive (Optional)',
+        rationale: 'Prevents uninstalling or force-closing Unclutter to bypass limits.',
+        isGranted: owner,
+        isRequired: false,
+        onAction: () async {
+          if (!owner) {
+            await enableProtection();
+          }
+        },
+      ),
+    ];
+  }
+}
+
+/// Represents a standardized permission diagnostic item with human-friendly rationale
+class PermissionDiagnostic {
+  final String id;
+  final String title;
+  final String description;
+  final String rationale;
+  final bool isGranted;
+  final bool isRequired;
+  final Future<void> Function() onAction;
+
+  const PermissionDiagnostic({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.rationale,
+    required this.isGranted,
+    this.isRequired = true,
+    required this.onAction,
+  });
 }

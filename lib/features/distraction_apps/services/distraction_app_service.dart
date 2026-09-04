@@ -95,14 +95,7 @@ class DistractionAppService extends GetxService {
 
     // 5. Fallback to automatic classifier if app info is found
     if (targetApp != null) {
-      final isDist = DistractionClassifier.isDistraction(targetApp);
-      if (isDist) {
-        final newEnabled = Set<String>.from(_settings.enabledPackages)..add(packageName);
-        _settings = _settings.copyWith(enabledPackages: newEnabled);
-        _saveSettings();
-        _syncWithAppConfigService();
-      }
-      return isDist;
+      return DistractionClassifier.isDistraction(targetApp);
     }
 
     // 6. Safety net keyword heuristics on package name
@@ -130,10 +123,6 @@ class DistractionAppService extends GetxService {
     ];
     for (final kw in distractionKeywords) {
       if (pkgLower.contains(kw)) {
-        final newEnabled = Set<String>.from(_settings.enabledPackages)..add(packageName);
-        _settings = _settings.copyWith(enabledPackages: newEnabled);
-        _saveSettings();
-        _syncWithAppConfigService();
         return true;
       }
     }

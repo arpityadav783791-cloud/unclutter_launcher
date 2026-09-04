@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+import 'app_radius.dart';
+import 'app_typography.dart';
 
 class AppTheme {
+  AppTheme._();
+
   static ThemeData get light => ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
@@ -17,6 +21,14 @@ class AppTheme {
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: false,
+        ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: AppColors.lightBackground,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.borderLg),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.lightBackground,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.topXl),
         ),
       );
 
@@ -36,62 +48,49 @@ class AppTheme {
           elevation: 0,
           centerTitle: false,
         ),
+        dialogTheme: const DialogThemeData(
+          backgroundColor: Color(0xFF111111),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.borderLg),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFF111111),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.topXl),
+        ),
       );
 
-  /// Returns responsive horizontal padding proportional to screen width
+  /// Returns responsive horizontal padding bounded between 16 and 32dp
   static double horizontalPadding(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    return (w * 0.07).clamp(16.0, 36.0);
+    return (w * 0.06).clamp(16.0, 32.0);
   }
 
-  /// Returns responsive vertical padding proportional to screen height
+  /// Returns responsive vertical padding bounded between 16 and 32dp
   static double verticalPadding(BuildContext context) {
     final h = MediaQuery.sizeOf(context).height;
     return (h * 0.025).clamp(16.0, 32.0);
   }
 
-  /// Returns responsive clock font size
+  /// Returns responsive clock font size bounded for small to large phones
   static double responsiveClockFontSize(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    return (w * 0.12).clamp(38.0, 64.0);
+    return (w * 0.12).clamp(40.0, 60.0);
   }
 
-  /// Returns responsive home favorites font size
+  /// Returns responsive app title font size bounded to prevent line breaks
   static double responsiveAppTitleFontSize(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    return (w * 0.05).clamp(17.0, 24.0);
+    return (w * 0.05).clamp(18.0, 22.0);
   }
 
   static TextTheme _textTheme(Color primary, Color secondary) {
     return TextTheme(
-      displayLarge: TextStyle(
-        fontSize: 48,
-        fontWeight: FontWeight.w300,
-        color: primary,
-        letterSpacing: -1.0,
-      ),
-      headlineMedium: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.w400,
-        color: primary,
-      ),
-      bodyLarge: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w400,
-        color: primary,
-        height: 1.4,
-      ),
-      bodyMedium: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
-        color: secondary,
-      ),
-      labelLarge: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: secondary,
-        letterSpacing: 0.5,
-      ),
+      displayLarge: AppTypography.clock.copyWith(color: primary),
+      headlineMedium: AppTypography.screenTitle.copyWith(color: primary),
+      bodyLarge: AppTypography.appTitle.copyWith(color: primary),
+      bodyMedium: AppTypography.body.copyWith(color: secondary),
+      bodySmall: AppTypography.bodySmall.copyWith(color: secondary),
+      labelLarge: AppTypography.button.copyWith(color: secondary),
+      labelSmall: AppTypography.caption.copyWith(color: secondary),
     );
   }
 }

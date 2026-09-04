@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/minimal_text.dart';
 import '../../apps/controllers/apps_controller.dart';
 import '../../apps/models/app_info.dart';
@@ -44,7 +47,6 @@ class HomeFavoritesWidget extends StatelessWidget {
       final isBold = settings.boldFont.value;
       final crossAxis = settings.currentCrossAxisAlignment;
       final textAlign = settings.currentTextAlign;
-      final scale = settings.textScale.value;
 
       if (favorites.isEmpty) {
         return Center(
@@ -55,17 +57,17 @@ class HomeFavoritesWidget extends StatelessWidget {
                 'No favorite apps yet',
                 style: TextStyle(
                   color: textColor,
-                  fontSize: 18 * scale,
+                  fontSize: 18,
                   fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               MinimalText(
                 'Swipe up to view all apps\nLong-press an app to add to favorites',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: secondaryColor.withValues(alpha: 0.7),
-                  fontSize: 14 * scale,
+                  fontSize: 14,
                   height: 1.4,
                 ),
               ),
@@ -81,7 +83,7 @@ class HomeFavoritesWidget extends StatelessWidget {
         final badge = '$workBadge$recentBadge';
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
           child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -93,17 +95,17 @@ class HomeFavoritesWidget extends StatelessWidget {
               );
             },
             onLongPress: () => onLongPressApp(context, app, name),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: AppRadius.borderXs,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: AppSpacing.xs,
+              ),
               child: MinimalText(
                 '$name$badge',
                 textAlign: textAlign,
-                style: TextStyle(
-                  fontSize: 20 * scale,
-                  fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
+                style: (isBold ? AppTypography.appTitleBold : AppTypography.appTitle).copyWith(
                   color: textColor,
-                  letterSpacing: 0.2,
                 ),
               ),
             ),
