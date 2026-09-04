@@ -22,6 +22,12 @@
     <!-- Request package uninstall directly from app context menu -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!-- Set wallpaper for Daily Curated Wallpaper feature -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+
+    <!-- Android 15+ (API 35+) Private Space profiles access -->
+    <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
+
     <application
         android:label="Minimal Launcher"
         android:name="${applicationName}"
@@ -86,5 +92,18 @@
                 <data android:scheme="android_secret_code" android:host="550055" />
             </intent-filter>
         </receiver>
+
+        <!-- Accessibility Service for Double-Tap Screen Locking -->
+        <service
+            android:name=".MyAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 </manifest>

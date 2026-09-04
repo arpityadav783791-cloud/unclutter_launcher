@@ -4,18 +4,27 @@ import android.Manifest
 import android.app.AppOpsManager
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
+import android.app.usage.UsageEvents
 import android.content.Context
 import android.content.Intent
+import android.content.ComponentName
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.content.pm.LauncherApps
+import android.content.pm.LauncherActivityInfo
 import android.os.Build
+import android.os.UserManager
+import android.os.UserHandle
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.app.SearchManager
 import android.app.admin.DevicePolicyManager
 import android.net.Uri
+import android.app.WallpaperManager
+import android.graphics.BitmapFactory
+import android.content.pm.ShortcutInfo
 import android.os.BatteryManager
 import android.provider.AlarmClock
 import android.provider.Settings
@@ -61,10 +70,12 @@ class MainActivity : FlutterActivity() {
                     }
                     "launchApp" -> {
                         val packageName = call.argument<String>("packageName")
+                        val userSerial = call.argument<Number>("userSerial")?.toLong()
+                        val activityName = call.argument<String>("activityName")
                         if (packageName.isNullOrBlank()) {
                             result.error("INVALID_ARGUMENT", "packageName is required", null)
                         } else {
-                            result.success(launchApp(packageName))
+                            result.success(launchApp(packageName, userSerial, activityName))
                         }
                     }
                     "isAppInstalled" -> {
@@ -196,9 +207,67 @@ class MainActivity : FlutterActivity() {
                     "lockScreen" -> {
                         result.success(lockScreen())
                     }
+                    "isAccessibilityServiceEnabled" -> {
+                        result.success(isAccessibilityServiceEnabled())
+                    }
+                    "openAccessibilitySettings" -> {
+                        openAccessibilitySettings()
+                        result.success(null)
+                    }
+                    "openScreenTimeApp" -> {
+                        val customPkg = call.argument<String>("customPackage")
+                        result.success(openScreenTimeApp(customPkg))
+                    }
+                    // ── E-Ink Subsystem ───────────────────────────
+                    "isEinkDevice" -> {
+                        result.success(isEinkDevice())
+                    }
+                    // ── Pinned Shortcuts Subsystem ────────────────
+                    "getPinnedShortcuts" -> {
+                        result.success(getPinnedShortcuts())
+                    }
+                    "launchShortcut" -> {
+                        val pkg = call.argument<String>("packageName") ?: ""
+                        val shortcutId = call.argument<String>("shortcutId") ?: ""
+                        val userSerial = call.argument<Number>("userSerial")?.toLong()
+                        result.success(launchShortcut(pkg, shortcutId, userSerial))
+                    }
+                    "unpinShortcut" -> {
+                        val pkg = call.argument<String>("packageName") ?: ""
+                        val shortcutId = call.argument<String>("shortcutId") ?: ""
+                        val userSerial = call.argument<Number>("userSerial")?.toLong()
+                        result.success(unpinShortcut(pkg, shortcutId, userSerial))
+                    }
+                    // ── Wallpaper Subsystem ────────────────────────
+                    "setWallpaper" -> {
+                        val bytes = call.argument<ByteArray>("bytes")
+                        val which = call.argument<Int>("which") ?: 1
+                        if (bytes != null) {
+                            result.success(setWallpaper(bytes, which))
+                        } else {
+                            result.error("INVALID_ARGUMENT", "bytes required", null)
+                        }
+                    }
+                    "clearWallpaper" -> {
+                        result.success(clearDeviceWallpaper())
+                    }
+                    // ── Android 15+ Private Space Subsystem ────────
+                    "isPrivateSpaceAvailable" -> {
+                        result.success(isPrivateSpaceAvailable())
+                    }
+                    "isPrivateSpaceLocked" -> {
+                        result.success(isPrivateSpaceLocked())
+                    }
+                    "togglePrivateSpace" -> {
+                        val requestUnlock = call.argument<Boolean>("requestUnlock") ?: true
+                        result.success(togglePrivateSpace(requestUnlock))
+                    }
                     else -> result.notImplemented()
                 }
             }
+
+        registerPackageChangeReceiver()
+        registerProfileChangeReceiver()
     }
 
     // ── Launcher helpers ──────────────────────────────────────
@@ -217,71 +286,156 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun getInstalledApps(): List<Map<String, Any?>> {
+        val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager
+        val myUserHandle = Process.myUserHandle()
+        val apps = mutableListOf<Map<String, Any?>>()
         val pm = packageManager
-        val intent = Intent(Intent.ACTION_MAIN, null)
-        intent.addCategory(Intent.CATEGORY_LAUNCHER)
 
-        val resolveInfos: List<ResolveInfo> = try {
-            pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
-        } catch (e: Exception) {
-            emptyList()
+        if (launcherApps != null && userManager != null) {
+            val profiles: List<UserHandle> = try {
+                userManager.userProfiles
+            } catch (e: Exception) {
+                listOf(myUserHandle)
+            }
+
+            for (user in profiles) {
+                val userSerial = try {
+                    userManager.getSerialNumberForUser(user)
+                } catch (e: Exception) {
+                    0L
+                }
+                val isWorkProfile = (user != myUserHandle)
+
+                val activityList: List<LauncherActivityInfo> = try {
+                    launcherApps.getActivityList(null, user)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+
+                for (info in activityList) {
+                    val appInfo = info.applicationInfo
+                    val pkg = appInfo.packageName ?: continue
+                    if (pkg == this.packageName) continue
+
+                    val appName = try {
+                        info.label?.toString() ?: pkg
+                    } catch (e: Exception) {
+                        pkg
+                    }
+
+                    val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+
+                    val isGame = ((appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0) ||
+                        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appInfo.category == ApplicationInfo.CATEGORY_GAME)
+
+                    val category = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        appInfo.category
+                    } else {
+                        -1
+                    }
+
+                    val installTime = try {
+                        info.firstInstallTime
+                    } catch (e: Exception) {
+                        try {
+                            pm.getPackageInfo(pkg, 0).firstInstallTime
+                        } catch (_: Exception) {
+                            0L
+                        }
+                    }
+
+                    val activityName = try {
+                        info.componentName?.className ?: ""
+                    } catch (e: Exception) {
+                        ""
+                    }
+
+                    apps.add(
+                        mapOf(
+                            "name" to appName,
+                            "packageName" to pkg,
+                            "isSystemApp" to isSystemApp,
+                            "isGame" to isGame,
+                            "category" to category,
+                            "installTime" to installTime,
+                            "userSerial" to userSerial,
+                            "isWorkProfile" to isWorkProfile,
+                            "activityName" to activityName
+                        )
+                    )
+                }
+            }
         }
 
-        val apps = mutableListOf<Map<String, Any?>>()
+        // Fallback to queryIntentActivities if LauncherApps returned empty
+        if (apps.isEmpty()) {
+            val intent = Intent(Intent.ACTION_MAIN, null)
+            intent.addCategory(Intent.CATEGORY_LAUNCHER)
 
-        for (info in resolveInfos) {
-            val activityInfo = info.activityInfo ?: continue
-            val pkg = activityInfo.packageName ?: continue
-            if (pkg == this.packageName) continue
-
-            val appName = try {
-                info.loadLabel(pm).toString()
+            val resolveInfos: List<ResolveInfo> = try {
+                pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
             } catch (e: Exception) {
-                pkg
+                emptyList()
             }
 
-            val isSystemApp = try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-            } catch (e: Exception) {
-                false
-            }
+            for (info in resolveInfos) {
+                val activityInfo = info.activityInfo ?: continue
+                val pkg = activityInfo.packageName ?: continue
+                if (pkg == this.packageName) continue
 
-            val isGame = try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                ((appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0) ||
-                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appInfo.category == ApplicationInfo.CATEGORY_GAME)
-            } catch (e: Exception) {
-                false
-            }
+                val appName = try {
+                    info.loadLabel(pm).toString()
+                } catch (e: Exception) {
+                    pkg
+                }
 
-            val category = try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    appInfo.category
-                } else {
+                val isSystemApp = try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                } catch (e: Exception) {
+                    false
+                }
+
+                val isGame = try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    ((appInfo.flags and ApplicationInfo.FLAG_IS_GAME) != 0) ||
+                        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && appInfo.category == ApplicationInfo.CATEGORY_GAME)
+                } catch (e: Exception) {
+                    false
+                }
+
+                val category = try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        appInfo.category
+                    } else {
+                        -1
+                    }
+                } catch (e: Exception) {
                     -1
                 }
-            } catch (e: Exception) {
-                -1
-            }
 
-            val installTime = try {
-                pm.getPackageInfo(pkg, 0).firstInstallTime
-            } catch (e: Exception) {
-                0L
-            }
+                val installTime = try {
+                    pm.getPackageInfo(pkg, 0).firstInstallTime
+                } catch (e: Exception) {
+                    0L
+                }
 
-            apps.add(
-                mapOf(
-                    "name" to appName,
-                    "packageName" to pkg,
-                    "isSystemApp" to isSystemApp,
-                    "isGame" to isGame,
-                    "category" to category,
-                    "installTime" to installTime
+                apps.add(
+                    mapOf(
+                        "name" to appName,
+                        "packageName" to pkg,
+                        "isSystemApp" to isSystemApp,
+                        "isGame" to isGame,
+                        "category" to category,
+                        "installTime" to installTime,
+                        "userSerial" to 0L,
+                        "isWorkProfile" to false,
+                        "activityName" to (activityInfo.name ?: "")
+                    )
                 )
-            )
+            }
         }
 
         return apps.sortedBy { (it["name"] as? String)?.lowercase() ?: "" }
@@ -425,26 +579,390 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun lockScreen(): Boolean {
-        return try {
-            if (protectedModeManager.isDeviceOwner()) {
-                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                dpm.lockNow()
-                true
-            } else {
-                false
+        // Priority 1: Accessibility Service (Android 9+ / API 28+)
+        // This does not break fingerprint or biometric unlock
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && MyAccessibilityService.isRunning()) {
+            if (MyAccessibilityService.lock()) {
+                return true
             }
+        }
+
+        // Priority 2: Device Admin / Device Owner fallback
+        try {
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            if (protectedModeManager.isDeviceOwner()) {
+                dpm.lockNow()
+                return true
+            }
+            val adminComponent = android.content.ComponentName(this, ProtectedDeviceAdminReceiver::class.java)
+            if (dpm.isAdminActive(adminComponent)) {
+                dpm.lockNow()
+                return true
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+
+        return false
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        if (MyAccessibilityService.isRunning()) return true
+        val enabledServices = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        val colonSplitter = android.text.TextUtils.SimpleStringSplitter(':')
+        colonSplitter.setString(enabledServices)
+        val expectedComponentName = "${packageName}/${MyAccessibilityService::class.java.canonicalName}"
+        val shortComponentName = "${packageName}/.MyAccessibilityService"
+        while (colonSplitter.hasNext()) {
+            val componentName = colonSplitter.next()
+            if (componentName.equals(expectedComponentName, ignoreCase = true) ||
+                componentName.equals(shortComponentName, ignoreCase = true) ||
+                componentName.contains("MyAccessibilityService")) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun openAccessibilitySettings() {
+        try {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            // fallback
+        }
+    }
+
+    // ── Dynamic Package Change Receiver ───────────────────────
+
+    private var packageChangeReceiver: android.content.BroadcastReceiver? = null
+
+    private fun registerPackageChangeReceiver() {
+        if (packageChangeReceiver != null) return
+        packageChangeReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val action = intent?.action ?: return
+                val dataUri = intent.data ?: return
+                val pkg = dataUri.schemeSpecificPart ?: return
+                if (pkg == packageName) return // Ignore ourselves
+
+                runOnUiThread {
+                    methodChannel?.invokeMethod(
+                        "onPackagesChanged",
+                        mapOf(
+                            "packageName" to pkg,
+                            "action" to action
+                        )
+                    )
+                }
+            }
+        }
+
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        registerReceiver(packageChangeReceiver, filter)
+    }
+
+    private fun unregisterPackageChangeReceiver() {
+        packageChangeReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // Ignore if already unregistered
+            }
+            packageChangeReceiver = null
+        }
+    }
+
+    // ── Dynamic Profile Change Receiver ───────────────────────
+
+    private var profileChangeReceiver: android.content.BroadcastReceiver? = null
+
+    private fun registerProfileChangeReceiver() {
+        if (profileChangeReceiver != null) return
+        profileChangeReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                runOnUiThread {
+                    methodChannel?.invokeMethod(
+                        "onPackagesChanged",
+                        mapOf(
+                            "action" to (intent?.action ?: "PROFILE_CHANGE")
+                        )
+                    )
+                }
+            }
+        }
+
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
+            }
+            if (Build.VERSION.SDK_INT >= 35) {
+                addAction("android.intent.action.PROFILE_AVAILABLE")
+                addAction("android.intent.action.PROFILE_UNAVAILABLE")
+            }
+        }
+        try {
+            registerReceiver(profileChangeReceiver, filter)
+        } catch (_: Exception) {}
+    }
+
+    private fun unregisterProfileChangeReceiver() {
+        profileChangeReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (_: Exception) {}
+            profileChangeReceiver = null
+        }
+    }
+
+    // ── E-Ink Subsystem ───────────────────────────────────────
+
+    private fun isEinkDevice(): Boolean {
+        try {
+            // 1. Refresh rate check (max supported refresh rate <= 30Hz)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val display = windowManager.defaultDisplay
+                val maxRate = display?.supportedModes?.maxOfOrNull { it.refreshRate } ?: 60f
+                if (maxRate <= 30.5f) return true
+            }
+
+            // 2. Brand & Manufacturer checks
+            val brand = (Build.BRAND ?: "").lowercase()
+            val manufacturer = (Build.MANUFACTURER ?: "").lowercase()
+            val einkBrands = listOf("onyx", "boox", "dasung", "bigme", "boyue", "meebook", "mudita")
+            if (einkBrands.any { brand.contains(it) || manufacturer.contains(it) }) return true
+
+            // 3. Hisense e-ink models
+            val model = Build.MODEL ?: ""
+            val hisenseRegex = Regex("\\bA[579]\\b|TOUCH|HI READER", RegexOption.IGNORE_CASE)
+            if (hisenseRegex.containsMatchIn(model)) return true
+
+            // 4. Onyx SDK reflection check
+            try {
+                Class.forName("android.onyx.ViewUpdateHelper")
+                return true
+            } catch (_: ClassNotFoundException) {}
+        } catch (_: Exception) {}
+        return false
+    }
+
+    // ── Pinned Shortcuts Subsystem ────────────────────────────
+
+    private fun getPinnedShortcuts(): List<Map<String, Any?>> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return emptyList()
+        val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps ?: return emptyList()
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager ?: return emptyList()
+        val result = mutableListOf<Map<String, Any?>>()
+
+        try {
+            val profiles = userManager.userProfiles
+            for (user in profiles) {
+                val userSerial = userManager.getSerialNumberForUser(user)
+                val query = LauncherApps.ShortcutQuery().apply {
+                    setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+                }
+                val shortcuts = launcherApps.getShortcuts(query, user) ?: continue
+                for (shortcut in shortcuts) {
+                    val label = shortcut.shortLabel?.toString()
+                        ?: shortcut.longLabel?.toString()
+                        ?: shortcut.id
+                    result.add(
+                        mapOf(
+                            "id" to shortcut.id,
+                            "packageName" to shortcut.`package`,
+                            "label" to label,
+                            "userSerial" to userSerial,
+                            "isEnabled" to shortcut.isEnabled
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return result
+    }
+
+    private fun launchShortcut(packageName: String, shortcutId: String, userSerial: Long?): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps ?: return false
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager ?: return false
+        val targetUser = if (userSerial != null && userSerial != 0L) {
+            userManager.getUserForSerialNumber(userSerial) ?: Process.myUserHandle()
+        } else {
+            Process.myUserHandle()
+        }
+        return try {
+            launcherApps.startShortcut(packageName, shortcutId, null, null, targetUser)
+            true
         } catch (e: Exception) {
             false
         }
     }
 
-    private fun launchApp(packageName: String): Boolean {
+    private fun unpinShortcut(packageName: String, shortcutId: String, userSerial: Long?): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps ?: return false
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager ?: return false
+        val targetUser = if (userSerial != null && userSerial != 0L) {
+            userManager.getUserForSerialNumber(userSerial) ?: Process.myUserHandle()
+        } else {
+            Process.myUserHandle()
+        }
         return try {
+            val query = LauncherApps.ShortcutQuery().apply {
+                setPackage(packageName)
+                setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+            }
+            val currentShortcuts = launcherApps.getShortcuts(query, targetUser) ?: emptyList()
+            val remainingIds = currentShortcuts.map { it.id }.filter { it != shortcutId }
+            launcherApps.pinShortcuts(packageName, remainingIds, targetUser)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // ── Wallpaper Subsystem ───────────────────────────────────
+
+    private fun setWallpaper(imageBytes: ByteArray, which: Int = 1): Boolean {
+        return try {
+            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            if (bitmap != null) {
+                val wm = WallpaperManager.getInstance(this)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    val flag = when (which) {
+                        2 -> WallpaperManager.FLAG_LOCK
+                        3 -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                        else -> WallpaperManager.FLAG_SYSTEM
+                    }
+                    wm.setBitmap(bitmap, null, true, flag)
+                } else {
+                    wm.setBitmap(bitmap)
+                }
+                bitmap.recycle()
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun clearDeviceWallpaper(): Boolean {
+        return try {
+            val wm = WallpaperManager.getInstance(this)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                wm.clear(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+            } else {
+                wm.clear()
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // ── Android 15+ Private Space Subsystem ───────────────────
+
+    private fun getPrivateSpaceUserHandle(): UserHandle? {
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager ?: return null
+        val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps ?: return null
+        try {
+            for (user in userManager.userProfiles) {
+                if (Build.VERSION.SDK_INT >= 35) {
+                    val info = launcherApps.getLauncherUserInfo(user)
+                    if (info?.userType == "android.os.usertype.profile.PRIVATE") {
+                        return user
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return null
+    }
+
+    private fun isPrivateSpaceAvailable(): Boolean {
+        return getPrivateSpaceUserHandle() != null
+    }
+
+    private fun isPrivateSpaceLocked(): Boolean {
+        val handle = getPrivateSpaceUserHandle() ?: return false
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager ?: return false
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                userManager.isQuietModeEnabled(handle)
+            } else {
+                false
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun togglePrivateSpace(requestUnlock: Boolean): Boolean {
+        val handle = getPrivateSpaceUserHandle() ?: return false
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager ?: return false
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                userManager.requestQuietModeEnabled(!requestUnlock, handle)
+            } else {
+                false
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun launchApp(packageName: String, userSerial: Long? = null, activityName: String? = null): Boolean {
+        return try {
+            val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+            val userManager = getSystemService(Context.USER_SERVICE) as? UserManager
+            val myUserHandle = Process.myUserHandle()
+
+            if (launcherApps != null && userManager != null && userSerial != null && userSerial != 0L) {
+                val targetUser = userManager.getUserForSerialNumber(userSerial)
+                if (targetUser != null) {
+                    val component = if (!activityName.isNullOrBlank()) {
+                        ComponentName(packageName, activityName)
+                    } else {
+                        launcherApps.getActivityList(packageName, targetUser).firstOrNull()?.componentName
+                    }
+
+                    if (component != null) {
+                        launcherApps.startMainActivity(component, targetUser, null, null)
+                        return true
+                    }
+                }
+            }
+
+            // Standard / main user launch
             val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(launchIntent)
                 true
+            } else if (launcherApps != null) {
+                val component = launcherApps.getActivityList(packageName, myUserHandle).firstOrNull()?.componentName
+                if (component != null) {
+                    launcherApps.startMainActivity(component, myUserHandle, null, null)
+                    true
+                } else {
+                    false
+                }
             } else {
                 false
             }
@@ -557,8 +1075,126 @@ class MainActivity : FlutterActivity() {
         )
     }
 
+    private fun openScreenTimeApp(customPackage: String?): Boolean {
+        // 1. Custom app assigned by user
+        if (!customPackage.isNullOrBlank()) {
+            val launchIntent = packageManager.getLaunchIntentForPackage(customPackage)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(launchIntent)
+                return true
+            }
+        }
+
+        // 2. Google Digital Wellbeing
+        val googleWellbeing = packageManager.getLaunchIntentForPackage("com.google.android.apps.wellbeing")
+        if (googleWellbeing != null) {
+            googleWellbeing.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(googleWellbeing)
+            return true
+        }
+
+        // 3. Samsung Forest Digital Wellbeing
+        val samsungForest = packageManager.getLaunchIntentForPackage("com.samsung.android.forest")
+        if (samsungForest != null) {
+            samsungForest.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(samsungForest)
+            return true
+        }
+
+        // 4. Fallback: Power usage summary or Usage Access settings
+        try {
+            val powerUsage = Intent(Intent.ACTION_POWER_USAGE_SUMMARY).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (powerUsage.resolveActivity(packageManager) != null) {
+                startActivity(powerUsage)
+                return true
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+
+        return try {
+            val usageIntent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(usageIntent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun queryUsage(start: Long, end: Long): List<Map<String, Any?>> {
         val usm = getUsageStatsManager()
+
+        // Priority 1: UsageEvents stream for microsecond-precise, real-time calculation
+        try {
+            val events = usm.queryEvents(start, end)
+            if (events != null) {
+                val aggregated = mutableMapOf<String, Long>()
+                val lastUsed = mutableMapOf<String, Long>()
+                val currentForegroundStart = mutableMapOf<String, Long>()
+                val event = UsageEvents.Event()
+                var eventCount = 0
+
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    eventCount++
+                    val pkg = event.packageName ?: continue
+                    if (pkg == packageName) continue // Skip launcher itself
+
+                    val time = event.timeStamp
+                    if (time > (lastUsed[pkg] ?: 0L)) {
+                        lastUsed[pkg] = time
+                    }
+
+                    when (event.eventType) {
+                        UsageEvents.Event.ACTIVITY_RESUMED,
+                        UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                            if (currentForegroundStart[pkg] == null) {
+                                currentForegroundStart[pkg] = time
+                            }
+                        }
+                        UsageEvents.Event.ACTIVITY_PAUSED,
+                        UsageEvents.Event.ACTIVITY_STOPPED,
+                        UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                            val startTime = currentForegroundStart.remove(pkg)
+                            if (startTime != null && time > startTime) {
+                                val duration = time - startTime
+                                aggregated[pkg] = (aggregated[pkg] ?: 0L) + duration
+                            }
+                        }
+                    }
+                }
+
+                // Close any currently active sessions that didn't receive a background event before 'end'
+                for ((pkg, startTime) in currentForegroundStart) {
+                    if (end > startTime) {
+                        val duration = end - startTime
+                        aggregated[pkg] = (aggregated[pkg] ?: 0L) + duration
+                    }
+                }
+
+                if (eventCount > 0 && aggregated.isNotEmpty()) {
+                    return aggregated
+                        .filter { it.value > 0 }
+                        .map { (pkg, time) ->
+                            mapOf(
+                                "packageName" to pkg,
+                                "totalTimeInForeground" to time,
+                                "lastTimeUsed" to (lastUsed[pkg] ?: 0L)
+                            )
+                        }
+                        .sortedByDescending { it["totalTimeInForeground"] as Long }
+                }
+            }
+        } catch (e: Exception) {
+            // Fall back to queryUsageStats below
+        }
+
+        // Priority 2: Fallback to queryUsageStats (INTERVAL_DAILY)
         val stats: List<UsageStats> = try {
             usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end)
                 ?: emptyList()
@@ -566,7 +1202,6 @@ class MainActivity : FlutterActivity() {
             emptyList()
         }
 
-        // Aggregate by package (query can return multiple intervals)
         val aggregated = mutableMapOf<String, Long>()
         val lastUsed = mutableMapOf<String, Long>()
 
@@ -719,6 +1354,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        unregisterPackageChangeReceiver()
+        unregisterProfileChangeReceiver()
         sessionHandler.removeCallbacks(sessionExpiryRunnable)
         super.onDestroy()
     }

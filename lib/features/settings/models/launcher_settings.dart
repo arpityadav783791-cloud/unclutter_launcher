@@ -17,6 +17,10 @@ class LauncherSettings {
   final String? swipeLeftPackage;
   final String? swipeRightPackage;
   final bool doubleTapToLock;
+  final bool showScreenTime;
+  final String? customScreenTimePackage;
+  final String eInkMode; // auto | on | off
+  final bool dailyWallpaperEnabled;
 
   const LauncherSettings({
     this.showClock = true,
@@ -35,6 +39,10 @@ class LauncherSettings {
     this.swipeLeftPackage,
     this.swipeRightPackage,
     this.doubleTapToLock = false,
+    this.showScreenTime = true,
+    this.customScreenTimePackage,
+    this.eInkMode = 'auto',
+    this.dailyWallpaperEnabled = false,
   });
 
   factory LauncherSettings.fromMap(Map<String, dynamic> map) {
@@ -55,6 +63,10 @@ class LauncherSettings {
       swipeLeftPackage: map['swipeLeftPackage'] as String?,
       swipeRightPackage: map['swipeRightPackage'] as String?,
       doubleTapToLock: map['doubleTapToLock'] as bool? ?? false,
+      showScreenTime: map['showScreenTime'] as bool? ?? true,
+      customScreenTimePackage: map['customScreenTimePackage'] as String?,
+      eInkMode: map['eInkMode'] as String? ?? 'auto',
+      dailyWallpaperEnabled: map['dailyWallpaperEnabled'] as bool? ?? false,
     );
   }
 
@@ -76,6 +88,10 @@ class LauncherSettings {
       'swipeLeftPackage': swipeLeftPackage,
       'swipeRightPackage': swipeRightPackage,
       'doubleTapToLock': doubleTapToLock,
+      'showScreenTime': showScreenTime,
+      'customScreenTimePackage': customScreenTimePackage,
+      'eInkMode': eInkMode,
+      'dailyWallpaperEnabled': dailyWallpaperEnabled,
     };
   }
 
@@ -96,8 +112,13 @@ class LauncherSettings {
     String? swipeLeftPackage,
     String? swipeRightPackage,
     bool? doubleTapToLock,
+    bool? showScreenTime,
+    String? customScreenTimePackage,
+    String? eInkMode,
+    bool? dailyWallpaperEnabled,
     bool clearSwipeLeft = false,
     bool clearSwipeRight = false,
+    bool clearCustomScreenTimePackage = false,
   }) {
     return LauncherSettings(
       showClock: showClock ?? this.showClock,
@@ -120,6 +141,13 @@ class LauncherSettings {
           ? null
           : (swipeRightPackage ?? this.swipeRightPackage),
       doubleTapToLock: doubleTapToLock ?? this.doubleTapToLock,
+      showScreenTime: showScreenTime ?? this.showScreenTime,
+      customScreenTimePackage: clearCustomScreenTimePackage
+          ? null
+          : (customScreenTimePackage ?? this.customScreenTimePackage),
+      eInkMode: eInkMode ?? this.eInkMode,
+      dailyWallpaperEnabled:
+          dailyWallpaperEnabled ?? this.dailyWallpaperEnabled,
     );
   }
 }

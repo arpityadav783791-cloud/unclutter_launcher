@@ -18,6 +18,8 @@ void main() {
       expect(s.swipeLeftPackage, isNull);
       expect(s.swipeRightPackage, isNull);
       expect(s.doubleTapToLock, false);
+      expect(s.showScreenTime, true);
+      expect(s.customScreenTimePackage, isNull);
     });
 
     test('serialization round-trip preserves all Olauncher fields', () {
@@ -34,6 +36,8 @@ void main() {
         swipeLeftPackage: 'com.custom.camera',
         swipeRightPackage: 'com.custom.phone',
         doubleTapToLock: true,
+        showScreenTime: false,
+        customScreenTimePackage: 'com.custom.wellbeing',
       );
 
       final map = original.toMap();
@@ -51,6 +55,8 @@ void main() {
       expect(restored.swipeLeftPackage, 'com.custom.camera');
       expect(restored.swipeRightPackage, 'com.custom.phone');
       expect(restored.doubleTapToLock, true);
+      expect(restored.showScreenTime, false);
+      expect(restored.customScreenTimePackage, 'com.custom.wellbeing');
     });
 
     test('copyWith allows mutating and clearing fields', () {
@@ -59,14 +65,22 @@ void main() {
         homeAlignment: 'right',
         homeAppsCount: 8,
         swipeLeftPackage: 'com.test.app',
+        showScreenTime: false,
+        customScreenTimePackage: 'com.custom.app',
       );
 
       expect(updated.homeAlignment, 'right');
       expect(updated.homeAppsCount, 8);
       expect(updated.swipeLeftPackage, 'com.test.app');
+      expect(updated.showScreenTime, false);
+      expect(updated.customScreenTimePackage, 'com.custom.app');
 
-      final cleared = updated.copyWith(clearSwipeLeft: true);
+      final cleared = updated.copyWith(
+        clearSwipeLeft: true,
+        clearCustomScreenTimePackage: true,
+      );
       expect(cleared.swipeLeftPackage, isNull);
+      expect(cleared.customScreenTimePackage, isNull);
     });
   });
 

@@ -212,5 +212,8 @@ class AppRouter {
     if (!Get.isRegistered<HomeGestureService>()) {
       Get.put(HomeGestureService(), permanent: true);
     }
+    if (!Get.isRegistered<AppSearchController>()) {
+      Get.put(AppSearchController(), permanent: true);
+    }
   }
 }

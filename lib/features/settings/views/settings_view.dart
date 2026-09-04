@@ -7,6 +7,7 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/services/permission_service.dart';
 import '../../onboarding/services/onboarding_service.dart';
 import '../controllers/settings_controller.dart';
+import '../services/daily_wallpaper_service.dart';
 
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
@@ -149,6 +150,39 @@ class SettingsView extends StatelessWidget {
 
                     const SizedBox(height: 12),
                     MinimalText(
+                      'E-Ink display mode',
+                      style: TextStyle(fontSize: 16, color: textColor),
+                    ),
+                    const SizedBox(height: 8),
+                    Obx(() {
+                      final eInk = controller.eInkMode.value;
+                      final isHw = controller.isHardwareEink.value;
+                      return Column(
+                        children: [
+                          _SelectRow(
+                            label: isHw ? 'Auto (E-Ink detected)' : 'Auto',
+                            selected: eInk == 'auto',
+                            textColor: textColor,
+                            onTap: () => controller.setEInkMode('auto'),
+                          ),
+                          _SelectRow(
+                            label: 'Always on (monochrome, zero animations)',
+                            selected: eInk == 'on',
+                            textColor: textColor,
+                            onTap: () => controller.setEInkMode('on'),
+                          ),
+                          _SelectRow(
+                            label: 'Off',
+                            selected: eInk == 'off',
+                            textColor: textColor,
+                            onTap: () => controller.setEInkMode('off'),
+                          ),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 12),
+                    MinimalText(
                       'Text size',
                       style: TextStyle(fontSize: 16, color: textColor),
                     ),
@@ -250,6 +284,81 @@ class SettingsView extends StatelessWidget {
                             onChanged: (val) =>
                                 controller.setHomeAppsCount(val.toInt()),
                           ),
+                        ],
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                    Obx(() => _ToggleRow(
+                          label: 'Show screen time on home',
+                          value: controller.showScreenTime.value,
+                          textColor: textColor,
+                          onTap: controller.toggleShowScreenTime,
+                        )),
+                    const SizedBox(height: 8),
+                    Obx(() {
+                      final enabled = controller.dailyWallpaperEnabled.value;
+                      return Column(
+                        children: [
+                          _ToggleRow(
+                            label: 'Daily curated wallpaper',
+                            value: enabled,
+                            textColor: textColor,
+                            onTap: () async {
+                              await controller.toggleDailyWallpaper();
+                              if (controller.dailyWallpaperEnabled.value &&
+                                  Get.isRegistered<DailyWallpaperService>()) {
+                                Get.find<DailyWallpaperService>()
+                                    .updateDailyWallpaper(isDark: isDark);
+                              }
+                            },
+                          ),
+                          if (enabled)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  left: 16, top: 4, bottom: 8),
+                              child: Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      if (Get.isRegistered<
+                                          DailyWallpaperService>()) {
+                                        Get.find<DailyWallpaperService>()
+                                            .updateDailyWallpaper(
+                                          isDark: isDark,
+                                          force: true,
+                                        );
+                                      }
+                                    },
+                                    child: MinimalText(
+                                      'Refresh wallpaper',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: secondaryColor,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  GestureDetector(
+                                    onTap: () {
+                                      if (Get.isRegistered<
+                                          DailyWallpaperService>()) {
+                                        Get.find<DailyWallpaperService>()
+                                            .resetWallpaper();
+                                      }
+                                    },
+                                    child: MinimalText(
+                                      'Reset to black',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: secondaryColor,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       );
                     }),

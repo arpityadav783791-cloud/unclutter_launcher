@@ -5,8 +5,9 @@ import '../../../core/services/native_bridge.dart';
 import '../../../core/widgets/minimal_text.dart';
 import '../../settings/controllers/settings_controller.dart';
 import '../controllers/launcher_controller.dart';
+import 'screen_time_picker_sheet.dart';
 
-/// Single Responsibility: Renders time, date, and battery level respecting settings.
+/// Single Responsibility: Renders time, date, battery level, and screen time respecting settings.
 class HomeClockWidget extends StatelessWidget {
   final LauncherController controller;
   final Color textColor;
@@ -56,6 +57,7 @@ class HomeClockWidget extends StatelessWidget {
       final isDateOnly = visibility == 'date_only';
       final showClock = !isDateOnly && settings.showClock.value;
       final showDate = settings.showDate.value;
+      final showScreenTime = settings.showScreenTime.value;
       final alignment = settings.homeAlignment.value;
       final crossAxis = _resolveCrossAxis(alignment);
       final textAlign = _resolveTextAlign(alignment);
@@ -106,6 +108,32 @@ class HomeClockWidget extends StatelessWidget {
                       ),
                 ),
               ),
+            if (showScreenTime && controller.todayScreenTime.value.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  if (Get.isRegistered<NativeBridge>()) {
+                    Get.find<NativeBridge>().openScreenTimeApp(
+                      customPackage: settings.customScreenTimePackage.value,
+                    );
+                  }
+                },
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  showScreenTimeOptionsBottomSheet(context);
+                },
+                child: MinimalText(
+                  controller.todayScreenTime.value,
+                  textAlign: textAlign,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: secondaryColor.withValues(alpha: 0.8),
+                        fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
+                        letterSpacing: 0.2,
+                      ),
+                ),
+              ),
+            ],
           ],
         ),
       );

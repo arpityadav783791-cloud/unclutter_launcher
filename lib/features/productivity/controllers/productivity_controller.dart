@@ -32,10 +32,14 @@ class ProductivityController extends GetxController {
   final TimedAccessController _timedAccessController =
       Get.find<TimedAccessController>();
 
-  Future<bool> handleAppLaunch(String packageName) async {
+  Future<bool> handleAppLaunch(
+    String packageName, {
+    int userSerial = 0,
+    String? activityName,
+  }) async {
     if (packageName.isEmpty) return false;
 
-    final app = _appsController.findByPackage(packageName);
+    final app = _appsController.findApp(packageName, userSerial: userSerial);
     if (app == null) {
       _showMessage('App not found');
       return false;
@@ -65,7 +69,7 @@ class ProductivityController extends GetxController {
     // 5. Timed Distraction Access
     if (_appConfigService.isDistraction(packageName)) {
       final context = Get.context;
-      if (context != null) {
+      if (context != null && context.mounted) {
         final allowed = await _timedAccessController.handleDistractionLaunch(
           context: context,
           app: app,
@@ -131,7 +135,9 @@ class ProductivityController extends GetxController {
           onClose: () => Navigator.pop(context),
           onExtend: () async {
             await _dailyLimitController.extend(app.packageName, extraMinutes: 5);
-            Navigator.pop(context);
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
             await handleAppLaunch(app.packageName);
           },
         ),
@@ -184,14 +190,22 @@ class ProductivityController extends GetxController {
   }
 
   Future<bool> _launch(AppInfo app) async {
-    final success = await _nativeAppService.launchApp(app.packageName);
+    final success = await _nativeAppService.launchApp(
+      app.packageName,
+      userSerial: app.userSerial,
+      activityName: app.activityName,
+    );
     if (!success) {
       _showMessage('Could not open ${app.name}');
     }
     return success;
   }
 
-  Future<bool> launch(AppInfo app) => handleAppLaunch(app.packageName);
+  Future<bool> launch(AppInfo app) => handleAppLaunch(
+        app.packageName,
+        userSerial: app.userSerial,
+        activityName: app.activityName,
+      );
 
   void _showMessage(String message) {
     Get.rawSnackbar(

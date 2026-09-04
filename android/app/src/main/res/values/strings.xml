@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Minimal Launcher</string>
+    <string name="accessibility_service_description">Used exclusively to lock the screen when you double-tap on the home screen. Minimal Launcher does not observe any personal data or read screen content.</string>
+</resources>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../../../core/services/native_bridge.dart';
 import '../services/settings_service.dart';
 
 class SettingsController extends GetxController {
@@ -24,12 +25,18 @@ class SettingsController extends GetxController {
   final RxnString swipeLeftPackage = RxnString();
   final RxnString swipeRightPackage = RxnString();
   final RxBool doubleTapToLock = false.obs;
+  final RxBool showScreenTime = true.obs;
+  final RxnString customScreenTimePackage = RxnString();
+  final RxString eInkMode = 'auto'.obs;
+  final RxBool isHardwareEink = false.obs;
+  final RxBool dailyWallpaperEnabled = false.obs;
 
   @override
   void onInit() {
     super.onInit();
     _sync();
     _applyStatusBar();
+    _detectHardwareEink();
   }
 
   void _sync() {
@@ -50,6 +57,19 @@ class SettingsController extends GetxController {
     swipeLeftPackage.value = s.swipeLeftPackage;
     swipeRightPackage.value = s.swipeRightPackage;
     doubleTapToLock.value = s.doubleTapToLock;
+    showScreenTime.value = s.showScreenTime;
+    customScreenTimePackage.value = s.customScreenTimePackage;
+    eInkMode.value = s.eInkMode;
+    dailyWallpaperEnabled.value = s.dailyWallpaperEnabled;
+  }
+
+  Future<void> _detectHardwareEink() async {
+    if (Get.isRegistered<NativeBridge>()) {
+      try {
+        final bridge = Get.find<NativeBridge>();
+        isHardwareEink.value = await bridge.isEinkDevice();
+      } catch (_) {}
+    }
   }
 
   void _applyStatusBar() {
@@ -150,9 +170,48 @@ class SettingsController extends GetxController {
     final next = !doubleTapToLock.value;
     await _service.setDoubleTapToLock(next);
     doubleTapToLock.value = next;
+
+    if (next && Get.isRegistered<NativeBridge>()) {
+      final bridge = Get.find<NativeBridge>();
+      final isEnabled = await bridge.isAccessibilityServiceEnabled();
+      if (!isEnabled) {
+        await bridge.openAccessibilitySettings();
+      }
+    }
+  }
+
+  Future<void> toggleShowScreenTime() async {
+    final next = !showScreenTime.value;
+    await _service.setShowScreenTime(next);
+    showScreenTime.value = next;
+  }
+
+  Future<void> setCustomScreenTimePackage(String? package) async {
+    await _service.setCustomScreenTimePackage(package);
+    customScreenTimePackage.value = package;
+  }
+
+  bool get isEinkActive {
+    if (eInkMode.value == 'on') return true;
+    if (eInkMode.value == 'off') return false;
+    return isHardwareEink.value;
+  }
+
+  Future<void> setEInkMode(String mode) async {
+    await _service.setEInkMode(mode);
+    eInkMode.value = mode;
+  }
+
+  Future<void> toggleDailyWallpaper() async {
+    final next = !dailyWallpaperEnabled.value;
+    await _service.setDailyWallpaperEnabled(next);
+    dailyWallpaperEnabled.value = next;
   }
 
   ThemeMode get flutterThemeMode {
+    if (isEinkActive) {
+      return ThemeMode.light; // E-Ink displays force light mode for contrast
+    }
     switch (themeMode.value) {
       case 'light':
         return ThemeMode.light;

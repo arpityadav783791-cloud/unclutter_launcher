@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
+import '../../../core/services/native_bridge.dart';
 import '../models/app_info.dart';
+import '../models/pinned_shortcut.dart';
 import '../services/native_app_service.dart';
 import '../services/app_config_service.dart';
 
@@ -9,6 +11,9 @@ class AppsController extends GetxController {
 
   final RxList<AppInfo> apps = <AppInfo>[].obs;       // visible only
   final RxList<AppInfo> allApps = <AppInfo>[].obs;    // includes hidden
+  final RxList<PinnedShortcut> pinnedShortcuts = <PinnedShortcut>[].obs;
+  final RxBool isPrivateSpaceAvailable = false.obs;
+  final RxBool isPrivateSpaceLocked = false.obs;
   final RxBool isLoading = true.obs;
   final RxString errorMessage = ''.obs;
 
@@ -21,6 +26,12 @@ class AppsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    if (Get.isRegistered<NativeBridge>()) {
+      Get.find<NativeBridge>().onPackagesChanged = (packageName, action) {
+        _nativeAppService.invalidateCache();
+        loadApps(forceRefresh: true);
+      };
+    }
     loadApps();
   }
 
@@ -46,6 +57,8 @@ class AppsController extends GetxController {
       _applyVisibility();
       _hasLoaded = true;
       _lastLoadedAt = DateTime.now();
+      await loadPinnedShortcuts();
+      await checkPrivateSpaceStatus();
     } catch (e) {
       errorMessage.value = 'Could not load apps';
       if (!_hasLoaded) {
@@ -70,7 +83,10 @@ class AppsController extends GetxController {
   bool _listEquals(List<AppInfo> a, List<AppInfo> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
-      if (a[i].packageName != b[i].packageName) return false;
+      if (a[i].packageName != b[i].packageName ||
+          a[i].userSerial != b[i].userSerial) {
+        return false;
+      }
     }
     return true;
   }
@@ -82,8 +98,25 @@ class AppsController extends GetxController {
 
   Future<void> refreshApps() => loadApps(forceRefresh: true);
 
-  Future<bool> launchApp(String packageName) async {
-    return await _nativeAppService.launchApp(packageName);
+  Future<bool> launchApp(
+    String packageName, {
+    int? userSerial,
+    String? activityName,
+  }) async {
+    return await _nativeAppService.launchApp(
+      packageName,
+      userSerial: userSerial,
+      activityName: activityName,
+    );
+  }
+
+  AppInfo? findApp(String packageName, {int userSerial = 0}) {
+    for (final app in allApps) {
+      if (app.packageName == packageName && app.userSerial == userSerial) {
+        return app;
+      }
+    }
+    return findByPackage(packageName);
   }
 
   AppInfo? findByPackage(String packageName) {
@@ -96,5 +129,72 @@ class AppsController extends GetxController {
 
   String displayName(AppInfo app) {
     return _configService.displayName(app.packageName, app.name);
+  }
+
+  Future<void> loadPinnedShortcuts() async {
+    if (Get.isRegistered<NativeBridge>()) {
+      try {
+        final shortcuts = await Get.find<NativeBridge>().getPinnedShortcuts();
+        pinnedShortcuts.assignAll(shortcuts);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> checkPrivateSpaceStatus() async {
+    if (Get.isRegistered<NativeBridge>()) {
+      try {
+        final bridge = Get.find<NativeBridge>();
+        isPrivateSpaceAvailable.value = await bridge.isPrivateSpaceAvailable();
+        if (isPrivateSpaceAvailable.value) {
+          isPrivateSpaceLocked.value = await bridge.isPrivateSpaceLocked();
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<bool> togglePrivateSpace() async {
+    if (Get.isRegistered<NativeBridge>()) {
+      try {
+        final bridge = Get.find<NativeBridge>();
+        final requestUnlock = isPrivateSpaceLocked.value;
+        final success =
+            await bridge.togglePrivateSpace(requestUnlock: requestUnlock);
+        await checkPrivateSpaceStatus();
+        await refreshApps();
+        return success;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  Future<bool> launchShortcut(PinnedShortcut shortcut) async {
+    if (Get.isRegistered<NativeBridge>()) {
+      try {
+        return await Get.find<NativeBridge>().launchShortcut(
+          packageName: shortcut.packageName,
+          shortcutId: shortcut.id,
+          userSerial: shortcut.userSerial,
+        );
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  Future<bool> unpinShortcut(PinnedShortcut shortcut) async {
+    if (Get.isRegistered<NativeBridge>()) {
+      try {
+        final success = await Get.find<NativeBridge>().unpinShortcut(
+          packageName: shortcut.packageName,
+          shortcutId: shortcut.id,
+          userSerial: shortcut.userSerial,
+        );
+        if (success) {
+          pinnedShortcuts.removeWhere((s) =>
+              s.id == shortcut.id && s.packageName == shortcut.packageName);
+        }
+        return success;
+      } catch (_) {}
+    }
+    return false;
   }
 }

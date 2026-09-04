@@ -26,7 +26,8 @@ class FavoritesController extends GetxController {
     final result = <AppInfo>[];
     for (final fav in favPackages) {
       for (final app in visibleApps) {
-        if (app.packageName == fav.packageName) {
+        if (app.uniqueKey == fav.packageName ||
+            app.packageName == fav.packageName) {
           result.add(app);
           break;
         }
@@ -37,7 +38,7 @@ class FavoritesController extends GetxController {
     if (result.length == favoriteApps.length) {
       bool same = true;
       for (var i = 0; i < result.length; i++) {
-        if (result[i].packageName != favoriteApps[i].packageName) {
+        if (result[i] != favoriteApps[i]) {
           same = false;
           break;
         }

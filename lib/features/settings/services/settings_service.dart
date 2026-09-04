@@ -110,4 +110,23 @@ class SettingsService extends GetxService {
   Future<void> setDoubleTapToLock(bool lock) async {
     await update(_settings.copyWith(doubleTapToLock: lock));
   }
+
+  Future<void> setShowScreenTime(bool show) async {
+    await update(_settings.copyWith(showScreenTime: show));
+  }
+
+  Future<void> setCustomScreenTimePackage(String? package) async {
+    await update(_settings.copyWith(
+      customScreenTimePackage: package,
+      clearCustomScreenTimePackage: package == null,
+    ));
+  }
+
+  Future<void> setEInkMode(String mode) async {
+    await update(_settings.copyWith(eInkMode: mode));
+  }
+
+  Future<void> setDailyWallpaperEnabled(bool enabled) async {
+    await update(_settings.copyWith(dailyWallpaperEnabled: enabled));
+  }
 }

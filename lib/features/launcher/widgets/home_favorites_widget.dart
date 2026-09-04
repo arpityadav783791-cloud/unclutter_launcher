@@ -101,14 +101,20 @@ class HomeFavoritesWidget extends StatelessWidget {
 
       final items = favorites.map((app) {
         final name = appsController.displayName(app);
-        final badge = app.isRecentInstall ? ' ✦' : '';
+        final recentBadge = app.isRecentInstall ? ' ✦' : '';
+        final workBadge = app.isWorkProfile ? ' 💼' : '';
+        final badge = '$workBadge$recentBadge';
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
-              productivity.handleAppLaunch(app.packageName);
+              productivity.handleAppLaunch(
+                app.packageName,
+                userSerial: app.userSerial,
+                activityName: app.activityName,
+              );
             },
             onLongPress: () => onLongPressApp(context, app, name),
             borderRadius: BorderRadius.circular(4),

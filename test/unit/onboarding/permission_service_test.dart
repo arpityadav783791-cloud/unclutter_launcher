@@ -4,6 +4,9 @@ import 'package:minimal_launcher/core/services/native_bridge.dart';
 import 'package:minimal_launcher/core/services/permission_service.dart';
 
 class MockNativeBridge extends GetxService implements NativeBridge {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   bool usageAccess = false;
   bool openedUsageSettings = false;
   bool notificationPermission = false;
@@ -21,6 +24,8 @@ class MockNativeBridge extends GetxService implements NativeBridge {
   void Function(String packageName)? onSessionExpired;
   @override
   void Function()? onRecoveryTriggered;
+  @override
+  void Function(String packageName, String action)? onPackagesChanged;
 
   @override
   Future<bool> hasUsagePermission() async => usageAccess;
@@ -131,6 +136,15 @@ class MockNativeBridge extends GetxService implements NativeBridge {
 
   @override
   Future<bool> lockScreen() async => true;
+
+  @override
+  Future<bool> isAccessibilityServiceEnabled() async => true;
+
+  @override
+  Future<void> openAccessibilitySettings() async {}
+
+  @override
+  Future<bool> openScreenTimeApp({String? customPackage}) async => true;
 }
 
 void main() {

@@ -21,7 +21,11 @@ class FakeNativeAppService extends GetxService implements NativeAppService {
       ];
 
   @override
-  Future<bool> launchApp(String packageName) async => true;
+  Future<bool> launchApp(
+    String packageName, {
+    int? userSerial,
+    String? activityName,
+  }) async => true;
 
   @override
   Future<bool> isAppInstalled(String packageName) async => true;

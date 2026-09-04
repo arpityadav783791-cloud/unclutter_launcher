@@ -53,11 +53,20 @@ class NativeAppService extends GetxService {
     _cachedAt = null;
   }
 
-  Future<bool> launchApp(String packageName) async {
+  Future<bool> launchApp(
+    String packageName, {
+    int? userSerial,
+    String? activityName,
+  }) async {
     try {
       final result = await _channel.invokeMethod<bool>(
         'launchApp',
-        {'packageName': packageName},
+        {
+          'packageName': packageName,
+          if (userSerial != null) 'userSerial': userSerial,
+          if (activityName != null && activityName.isNotEmpty)
+            'activityName': activityName,
+        },
       );
       return result ?? false;
     } on PlatformException {

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../../features/apps/models/pinned_shortcut.dart';
 
 /// Bridge between Flutter and Android native code.
 /// All launcher-specific Android operations go through this service.
@@ -9,6 +10,7 @@ class NativeBridge extends GetxService {
 
   void Function(String packageName)? onSessionExpired;
   void Function()? onRecoveryTriggered;
+  void Function(String packageName, String action)? onPackagesChanged;
 
   @override
   void onInit() {
@@ -25,6 +27,13 @@ class NativeBridge extends GetxService {
     }
     if (call.method == 'onRecoveryTriggered') {
       onRecoveryTriggered?.call();
+      return true;
+    }
+    if (call.method == 'onPackagesChanged') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final packageName = args?['packageName'] as String? ?? '';
+      final action = args?['action'] as String? ?? '';
+      onPackagesChanged?.call(packageName, action);
       return true;
     }
     return null;
@@ -317,6 +326,173 @@ class NativeBridge extends GetxService {
   Future<bool> lockScreen() async {
     try {
       final result = await _channel.invokeMethod<bool>('lockScreen');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Checks whether accessibility service is currently enabled
+  Future<bool> isAccessibilityServiceEnabled() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('isAccessibilityServiceEnabled');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Opens system Accessibility settings screen
+  Future<void> openAccessibilitySettings() async {
+    try {
+      await _channel.invokeMethod('openAccessibilitySettings');
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Opens default Digital Wellbeing or custom assigned screen time application
+  Future<bool> openScreenTimeApp({String? customPackage}) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'openScreenTimeApp',
+        {'customPackage': customPackage},
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  // ── E-Ink Subsystem ─────────────────────────────────────────
+
+  /// Detects whether current device is an E-Ink hardware display
+  Future<bool> isEinkDevice() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('isEinkDevice');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  // ── Pinned Shortcuts Subsystem ──────────────────────────────
+
+  /// Queries all pinned shortcuts across profiles
+  Future<List<PinnedShortcut>> getPinnedShortcuts() async {
+    try {
+      final result = await _channel.invokeMethod<List<dynamic>>('getPinnedShortcuts');
+      if (result == null) return [];
+      return result
+          .whereType<Map<dynamic, dynamic>>()
+          .map((m) => PinnedShortcut.fromMap(m))
+          .toList();
+    } on PlatformException {
+      return [];
+    }
+  }
+
+  /// Launches an Android pinned shortcut
+  Future<bool> launchShortcut({
+    required String packageName,
+    required String shortcutId,
+    int? userSerial,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'launchShortcut',
+        {
+          'packageName': packageName,
+          'shortcutId': shortcutId,
+          'userSerial': userSerial,
+        },
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Unpins / removes an Android pinned shortcut
+  Future<bool> unpinShortcut({
+    required String packageName,
+    required String shortcutId,
+    int? userSerial,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'unpinShortcut',
+        {
+          'packageName': packageName,
+          'shortcutId': shortcutId,
+          'userSerial': userSerial,
+        },
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  // ── Daily Curated Wallpaper Subsystem ───────────────────────
+
+  /// Sets device wallpaper for system, lock, or both
+  /// [which]: 1 = system, 2 = lock, 3 = both
+  Future<bool> setWallpaper(Uint8List bytes, {int which = 1}) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'setWallpaper',
+        {
+          'bytes': bytes,
+          'which': which,
+        },
+      );
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Clears wallpaper back to default / black minimalist background
+  Future<bool> clearWallpaper() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('clearWallpaper');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  // ── Android 15+ Private Space Subsystem ─────────────────────
+
+  /// Checks if a Private Space profile exists on Android 15+ (API 35+)
+  Future<bool> isPrivateSpaceAvailable() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('isPrivateSpaceAvailable');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Checks if Private Space is currently locked (quiet mode active)
+  Future<bool> isPrivateSpaceLocked() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('isPrivateSpaceLocked');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Requests locking or unlocking Private Space (prompts biometric/PIN)
+  Future<bool> togglePrivateSpace({bool requestUnlock = true}) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'togglePrivateSpace',
+        {'requestUnlock': requestUnlock},
+      );
       return result ?? false;
     } on PlatformException {
       return false;

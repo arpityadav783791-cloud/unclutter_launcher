@@ -17,6 +17,7 @@ import 'features/focus_mode/controllers/focus_mode_controller.dart';
 import 'features/scheduled_block/services/schedule_service.dart';
 import 'features/scheduled_block/controllers/schedule_controller.dart';
 import 'features/settings/services/settings_service.dart';
+import 'features/settings/services/daily_wallpaper_service.dart';
 import 'features/settings/controllers/settings_controller.dart';
 import 'features/timed_access/services/timed_access_service.dart';
 import 'features/timed_access/controllers/timed_access_controller.dart';
@@ -55,6 +56,7 @@ void main() async {
   Get.put(ProtectedModeController(), permanent: true);
   Get.put(SettingsService(), permanent: true);
   Get.put(SettingsController(), permanent: true);
+  Get.put(DailyWallpaperService(), permanent: true);
   Get.put(HomeGestureService(), permanent: true);
 
   runApp(const MinimalLauncherApp());

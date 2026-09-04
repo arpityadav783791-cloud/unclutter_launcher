@@ -23,6 +23,7 @@ class ScreenTimeController extends GetxController {
     Future.microtask(refresh);
   }
 
+  @override
   Future<void> refresh() async {
     if (!_hasLoadedOnce) {
       isLoading.value = true;

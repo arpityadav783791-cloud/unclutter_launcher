@@ -38,10 +38,16 @@ class FakeProtectedModeService extends GetxService implements ProtectedModeServi
 
 class FakeNativeBridge extends GetxService implements NativeBridge {
   @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  @override
   void Function(String packageName)? onSessionExpired;
 
   @override
   void Function()? onRecoveryTriggered;
+
+  @override
+  void Function(String packageName, String action)? onPackagesChanged;
 
   @override
   Future<bool> isDefaultLauncher() async => false;
@@ -129,6 +135,15 @@ class FakeNativeBridge extends GetxService implements NativeBridge {
 
   @override
   Future<bool> lockScreen() async => true;
+
+  @override
+  Future<bool> isAccessibilityServiceEnabled() async => true;
+
+  @override
+  Future<void> openAccessibilitySettings() async {}
+
+  @override
+  Future<bool> openScreenTimeApp({String? customPackage}) async => true;
 }
 
 void main() {
