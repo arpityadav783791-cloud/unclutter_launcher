@@ -31,7 +31,7 @@ void showGestureAppPickerSheet(
   showModalBottomSheet(
     context: context,
     backgroundColor:
-        isDark ? const Color(0xFF111111) : const Color(0xFFF5F5F5),
+        isDark ? AppColors.darkBackground : const Color(0xFFF5F5F5),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

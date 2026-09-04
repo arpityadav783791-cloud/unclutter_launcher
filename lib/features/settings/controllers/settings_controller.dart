@@ -316,6 +316,43 @@ class SettingsController extends GetxController {
     dailyWallpaperEnabled.value = next;
   }
 
+  CrossAxisAlignment get currentCrossAxisAlignment {
+    switch (homeAlignment.value) {
+      case 'center':
+        return CrossAxisAlignment.center;
+      case 'right':
+        return CrossAxisAlignment.end;
+      case 'left':
+      default:
+        return CrossAxisAlignment.start;
+    }
+  }
+
+  TextAlign get currentTextAlign {
+    switch (homeAlignment.value) {
+      case 'center':
+        return TextAlign.center;
+      case 'right':
+        return TextAlign.right;
+      case 'left':
+      default:
+        return TextAlign.left;
+    }
+  }
+
+  Alignment get currentFavoritesAlignment {
+    final isBottom = homeBottomAlignment.value;
+    switch (homeAlignment.value) {
+      case 'center':
+        return isBottom ? Alignment.bottomCenter : Alignment.center;
+      case 'right':
+        return isBottom ? Alignment.bottomRight : Alignment.centerRight;
+      case 'left':
+      default:
+        return isBottom ? Alignment.bottomLeft : Alignment.centerLeft;
+    }
+  }
+
   ThemeMode get flutterThemeMode {
     if (isEinkActive) {
       return ThemeMode.light; // E-Ink displays force light mode for contrast

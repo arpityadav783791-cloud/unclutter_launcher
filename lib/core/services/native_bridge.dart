@@ -11,6 +11,9 @@ class NativeBridge extends GetxService {
   void Function(String packageName)? onSessionExpired;
   void Function()? onRecoveryTriggered;
   void Function(String packageName, String action)? onPackagesChanged;
+  void Function(String packageName)? onDistractionIntercepted;
+  void Function(String packageName, int durationMinutes)? onSessionExtended;
+  void Function(String packageName)? onBlockAppRequested;
 
   @override
   void onInit() {
@@ -23,6 +26,25 @@ class NativeBridge extends GetxService {
       final args = call.arguments as Map<dynamic, dynamic>?;
       final packageName = args?['packageName'] as String? ?? '';
       onSessionExpired?.call(packageName);
+      return true;
+    }
+    if (call.method == 'onSessionExtended') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final packageName = args?['packageName'] as String? ?? '';
+      final durationMinutes = (args?['durationMinutes'] as num?)?.toInt() ?? 5;
+      onSessionExtended?.call(packageName, durationMinutes);
+      return true;
+    }
+    if (call.method == 'onBlockAppRequested') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final packageName = args?['packageName'] as String? ?? '';
+      onBlockAppRequested?.call(packageName);
+      return true;
+    }
+    if (call.method == 'onDistractionIntercepted') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final packageName = args?['packageName'] as String? ?? '';
+      onDistractionIntercepted?.call(packageName);
       return true;
     }
     if (call.method == 'onRecoveryTriggered') {
@@ -58,15 +80,21 @@ class NativeBridge extends GetxService {
     }
   }
 
-  /// Starts a native monitoring timer for a timed distraction session
+  /// Starts a native monitoring timer and usage overlay for a timed distraction session
   Future<void> startTimedSession({
     required String packageName,
+    String? appName,
     required int durationSeconds,
+    int? startedAtMillis,
+    int? expiresAtMillis,
   }) async {
     try {
       await _channel.invokeMethod('startTimedSession', {
         'packageName': packageName,
+        'appName': appName,
         'durationSeconds': durationSeconds,
+        'startedAtMillis': startedAtMillis,
+        'expiresAtMillis': expiresAtMillis,
       });
     } on PlatformException catch (e) {
       Get.log('NativeBridge.startTimedSession error: ${e.message}');
@@ -88,6 +116,15 @@ class NativeBridge extends GetxService {
       await _channel.invokeMethod('returnToLauncher');
     } on PlatformException catch (e) {
       Get.log('NativeBridge.returnToLauncher error: ${e.message}');
+    }
+  }
+
+  /// Syncs configured distraction packages with Android native layer for notification interception
+  Future<void> syncDistractionPackages(List<String> packages) async {
+    try {
+      await _channel.invokeMethod('setDistractionPackages', {'packages': packages});
+    } on PlatformException {
+      // ignore
     }
   }
 
@@ -347,6 +384,25 @@ class NativeBridge extends GetxService {
   Future<void> openAccessibilitySettings() async {
     try {
       await _channel.invokeMethod('openAccessibilitySettings');
+    } on PlatformException {
+      // ignore
+    }
+  }
+
+  /// Checks whether overlay permission or accessibility service is enabled to draw the timer
+  Future<bool> hasOverlayPermission() async {
+    try {
+      final result = await _channel.invokeMethod<bool>('hasOverlayPermission');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Requests overlay permission or opens accessibility settings
+  Future<void> requestOverlayPermission() async {
+    try {
+      await _channel.invokeMethod('requestOverlayPermission');
     } on PlatformException {
       // ignore
     }

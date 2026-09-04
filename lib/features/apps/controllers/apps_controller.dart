@@ -6,6 +6,8 @@ import '../models/app_info.dart';
 import '../models/pinned_shortcut.dart';
 import '../services/native_app_service.dart';
 import '../services/app_config_service.dart';
+import '../../distraction_apps/services/distraction_app_service.dart';
+import '../../distraction_apps/controllers/distraction_app_controller.dart';
 
 class AppsController extends GetxController {
   final NativeAppService _nativeAppService = Get.find<NativeAppService>();
@@ -65,6 +67,12 @@ class AppsController extends GetxController {
       appList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       allApps.assignAll(appList);
       await _configService.autoDetectDistractions(result);
+      if (Get.isRegistered<DistractionAppService>()) {
+        await Get.find<DistractionAppService>().autoDetectDistractions(result);
+        if (Get.isRegistered<DistractionAppController>()) {
+          Get.find<DistractionAppController>().refreshList();
+        }
+      }
       _applyVisibility();
       _hasLoaded = true;
       _lastLoadedAt = DateTime.now();

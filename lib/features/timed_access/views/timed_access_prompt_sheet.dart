@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import '../../../core/services/native_bridge.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/minimal_text.dart';
 
 /// Minimalist bottom sheet asking the user how long they wish to use a distraction app.
@@ -26,6 +29,22 @@ class _TimedAccessPromptSheetState extends State<TimedAccessPromptSheet> {
   bool _isCustomSelected = false;
   final TextEditingController _customController = TextEditingController();
   String? _errorMessage;
+  bool _hasOverlayPermission = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOverlayPermission();
+  }
+
+  Future<void> _checkOverlayPermission() async {
+    if (Get.isRegistered<NativeBridge>()) {
+      final perm = await Get.find<NativeBridge>().hasOverlayPermission();
+      if (mounted) {
+        setState(() => _hasOverlayPermission = perm);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -56,18 +75,20 @@ class _TimedAccessPromptSheetState extends State<TimedAccessPromptSheet> {
         isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
+    final horizontalPadding = AppTheme.horizontalPadding(context);
+
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(28, 24, 28, 28 + bottomInset),
+        padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 28 + bottomInset),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             MinimalText(
-              'How long do you want to use this app?',
+              'How long do you need?',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
                 color: textColor,
                 height: 1.3,
               ),
@@ -87,9 +108,62 @@ class _TimedAccessPromptSheetState extends State<TimedAccessPromptSheet> {
             ),
             const SizedBox(height: 8),
 
+            if (!_hasOverlayPermission) ...[
+              GestureDetector(
+                onTap: () async {
+                  if (Get.isRegistered<NativeBridge>()) {
+                    await Get.find<NativeBridge>().requestOverlayPermission();
+                    await Future.delayed(const Duration(seconds: 1));
+                    _checkOverlayPermission();
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFEEEEEE),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 16,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Enable overlay to show timer over apps',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Enable',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+
             if (!_isCustomSelected) ...[
               _OptionTile(
-                label: '5 minutes',
+                label: '5 min',
                 color: textColor,
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -97,7 +171,7 @@ class _TimedAccessPromptSheetState extends State<TimedAccessPromptSheet> {
                 },
               ),
               _OptionTile(
-                label: '10 minutes',
+                label: '10 min',
                 color: textColor,
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -105,7 +179,7 @@ class _TimedAccessPromptSheetState extends State<TimedAccessPromptSheet> {
                 },
               ),
               _OptionTile(
-                label: '15 minutes',
+                label: '15 min',
                 color: textColor,
                 onTap: () {
                   HapticFeedback.lightImpact();

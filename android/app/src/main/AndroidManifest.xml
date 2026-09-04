@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Required for listing installed apps (Android 11+) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -15,6 +16,13 @@
 
     <!-- Notifications permission on Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Exact Alarm scheduling for reliable timed detox session enforcement -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
     <!-- Expand status bar / notifications panel -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
@@ -90,6 +98,16 @@
                 <action android:name="android.provider.Telephony.SECRET_CODE" />
                 <action android:name="android.telephony.action.SECRET_CODE" />
                 <data android:scheme="android_secret_code" android:host="550055" />
+            </intent-filter>
+        </receiver>
+
+        <!-- BroadcastReceiver for Timed Detox Session Expiration and Ongoing Notification actions -->
+        <receiver
+            android:name=".SessionExpiryReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.minimal.launcher.ACTION_SESSION_EXPIRED" />
+                <action android:name="com.minimal.launcher.ACTION_END_SESSION" />
             </intent-filter>
         </receiver>
 

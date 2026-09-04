@@ -105,8 +105,6 @@ class DistractionDetector {
   /// Checks whether an application belongs to distracting categories
   /// (Social Media, Video/Entertainment, or Games).
   static bool isDistraction(AppInfo app) {
-    if (app.isSystemApp) return false;
-
     final pkgLower = app.packageName.toLowerCase();
     if (_essentialPackages.contains(pkgLower)) return false;
 
@@ -128,6 +126,9 @@ class DistractionDetector {
         return true;
       }
     }
+
+    // If it did not match any distraction rule, and is a system app, exclude it
+    if (app.isSystemApp) return false;
 
     return false;
   }

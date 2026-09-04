@@ -26,6 +26,8 @@ import 'features/protected_mode/controllers/protected_mode_controller.dart';
 import 'core/services/permission_service.dart';
 import 'features/onboarding/services/onboarding_service.dart';
 import 'features/launcher/services/home_gesture_service.dart';
+import 'features/distraction_apps/services/distraction_app_service.dart';
+import 'features/distraction_apps/controllers/distraction_app_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +60,8 @@ void main() async {
   Get.put(SettingsController(), permanent: true);
   Get.put(DailyWallpaperService(), permanent: true);
   Get.put(HomeGestureService(), permanent: true);
+  Get.put(DistractionAppService(), permanent: true);
+  Get.put(DistractionAppController(), permanent: true);
 
   runApp(const MinimalLauncherApp());
 }

@@ -70,7 +70,7 @@ void showAppOptionsBottomSheet({
   showModalBottomSheet(
     context: context,
     backgroundColor:
-        isDark ? const Color(0xFF111111) : const Color(0xFFF5F5F5),
+        isDark ? AppColors.darkBackground : const Color(0xFFF5F5F5),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -110,7 +110,12 @@ void showAppOptionsBottomSheet({
                 color: textColor,
                 onTap: () {
                   Navigator.pop(ctx);
-                  productivity.handleAppLaunch(app.packageName);
+                  productivity.handleAppLaunch(
+                    app.packageName,
+                    userSerial: app.userSerial,
+                    activityName: app.activityName,
+                    context: context,
+                  );
                 },
               ),
               OptionTile(

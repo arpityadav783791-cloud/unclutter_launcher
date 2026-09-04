@@ -10,6 +10,7 @@ class AppTheme {
           primary: AppColors.accent,
           surface: AppColors.lightBackground,
           onSurface: AppColors.lightText,
+          onSurfaceVariant: AppColors.lightSecondary,
         ),
         textTheme: _textTheme(AppColors.lightText, AppColors.lightSecondary),
         appBarTheme: const AppBarTheme(
@@ -27,6 +28,7 @@ class AppTheme {
           primary: AppColors.accent,
           surface: AppColors.darkBackground,
           onSurface: AppColors.darkText,
+          onSurfaceVariant: AppColors.darkSecondary,
         ),
         textTheme: _textTheme(AppColors.darkText, AppColors.darkSecondary),
         appBarTheme: const AppBarTheme(
@@ -35,6 +37,30 @@ class AppTheme {
           centerTitle: false,
         ),
       );
+
+  /// Returns responsive horizontal padding proportional to screen width
+  static double horizontalPadding(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    return (w * 0.07).clamp(16.0, 36.0);
+  }
+
+  /// Returns responsive vertical padding proportional to screen height
+  static double verticalPadding(BuildContext context) {
+    final h = MediaQuery.sizeOf(context).height;
+    return (h * 0.025).clamp(16.0, 32.0);
+  }
+
+  /// Returns responsive clock font size
+  static double responsiveClockFontSize(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    return (w * 0.12).clamp(38.0, 64.0);
+  }
+
+  /// Returns responsive home favorites font size
+  static double responsiveAppTitleFontSize(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    return (w * 0.05).clamp(17.0, 24.0);
+  }
 
   static TextTheme _textTheme(Color primary, Color secondary) {
     return TextTheme(

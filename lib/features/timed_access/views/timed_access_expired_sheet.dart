@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/minimal_text.dart';
+import 'package:get/get.dart';
+import '../../focus_mode/controllers/focus_mode_controller.dart';
+import '../../screen_time/services/usage_stats_service.dart';
 
-/// Minimalist bottom sheet displayed when a timed distraction session expires.
+/// Floating expiration dialog that matches the requested design:
+/// - [ Extend ] [ TAKE ME OUT OF HERE ]
+/// - [ Block <AppName> ]
+/// - Time remaining: 0 min
+/// - X h Y min spent today / X h Y min last 7 days
 class TimedAccessExpiredSheet extends StatefulWidget {
   final String appName;
   final String packageName;
@@ -23,14 +28,48 @@ class TimedAccessExpiredSheet extends StatefulWidget {
 }
 
 class _TimedAccessExpiredSheetState extends State<TimedAccessExpiredSheet> {
+  bool _showExtensionOptions = false;
   bool _isCustomSelected = false;
   final TextEditingController _customController = TextEditingController();
   String? _errorMessage;
+
+  String _todaySpent = '1 h 56 min';
+  String _weekSpent = '15 h 10 min';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsageStats();
+  }
 
   @override
   void dispose() {
     _customController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsageStats() async {
+    try {
+      if (Get.isRegistered<UsageStatsService>()) {
+        final usage = await Get.find<UsageStatsService>().getAppUsage(widget.packageName);
+        if (mounted && (usage.todayMs > 0 || usage.weekMs > 0)) {
+          setState(() {
+            _todaySpent = _formatDuration(usage.todayMs);
+            _weekSpent = _formatDuration(usage.weekMs);
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  String _formatDuration(int ms) {
+    final totalMinutes = ms ~/ 60000;
+    if (totalMinutes < 60) {
+      return '$totalMinutes min';
+    }
+    final hours = totalMinutes ~/ 60;
+    final mins = totalMinutes % 60;
+    return mins > 0 ? '$hours h $mins min' : '$hours h';
   }
 
   void _submitCustom() {
@@ -39,7 +78,7 @@ class _TimedAccessExpiredSheetState extends State<TimedAccessExpiredSheet> {
 
     if (value == null || value < 1 || value > 60) {
       setState(() {
-        _errorMessage = 'Please enter a duration between 1 and 60 minutes.';
+        _errorMessage = 'Duration must be 1 to 60 minutes.';
       });
       return;
     }
@@ -48,101 +87,161 @@ class _TimedAccessExpiredSheetState extends State<TimedAccessExpiredSheet> {
     widget.onExtendDuration(value);
   }
 
+  void _blockApp() {
+    HapticFeedback.mediumImpact();
+    if (Get.isRegistered<FocusModeController>()) {
+      Get.find<FocusModeController>().toggleBlockedApp(widget.packageName);
+    }
+    Get.rawSnackbar(
+      message: '${widget.appName} blocked',
+      duration: const Duration(seconds: 2),
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFF222222),
+      borderRadius: 8,
+      margin: const EdgeInsets.all(16),
+    );
+    widget.onDone();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(28, 24, 28, 28 + bottomInset),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            MinimalText(
-              'Your time is up.',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: textColor,
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: 4),
-            MinimalText(
-              'Session ended for ${widget.appName}',
-              style: TextStyle(
-                fontSize: 14,
-                color: secondaryColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            MinimalText(
-              'Need more time?',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w400,
-                color: textColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 1,
-              color: secondaryColor.withValues(alpha: 0.12),
-            ),
-            const SizedBox(height: 8),
-
-            if (!_isCustomSelected) ...[
-              _OptionTile(
-                label: '5 minutes',
-                color: textColor,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414), // AMOLED deep black
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white, width: 1.5),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Row 1: Extend & TAKE ME OUT OF HERE ──────────────────
+          Row(
+            children: [
+              // [ Extend ] Button
+              InkWell(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  widget.onExtendDuration(5);
-                },
-              ),
-              _OptionTile(
-                label: '10 minutes',
-                color: textColor,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  widget.onExtendDuration(10);
-                },
-              ),
-              _OptionTile(
-                label: '15 minutes',
-                color: textColor,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  widget.onExtendDuration(15);
-                },
-              ),
-              _OptionTile(
-                label: 'Custom',
-                color: secondaryColor,
-                onTap: () {
-                  HapticFeedback.selectionClick();
                   setState(() {
-                    _isCustomSelected = true;
+                    _showExtensionOptions = !_showExtensionOptions;
+                    _isCustomSelected = false;
                     _errorMessage = null;
                   });
                 },
-              ),
-            ] else ...[
-              const SizedBox(height: 8),
-              MinimalText(
-                'Custom duration (1–60 min):',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  color: textColor,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _showExtensionOptions ? Colors.white24 : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: const Text(
+                    'Extend',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(width: 10),
+
+              // [ TAKE ME OUT OF HERE ] Button
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    widget.onDone();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'TAKE ME OUT OF HERE',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Row 2: Block <AppName> ────────────────────────────────
+          InkWell(
+            onTap: _blockApp,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(
+                'Block ${widget.appName}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
+          // ── Extension Duration Choices (when Extend clicked) ──────
+          if (_showExtensionOptions) ...[
+            const SizedBox(height: 16),
+            if (!_isCustomSelected) ...[
+              Row(
+                children: [
+                  _DurationPill(
+                    label: '5m',
+                    onTap: () => widget.onExtendDuration(5),
+                  ),
+                  const SizedBox(width: 8),
+                  _DurationPill(
+                    label: '10m',
+                    onTap: () => widget.onExtendDuration(10),
+                  ),
+                  const SizedBox(width: 8),
+                  _DurationPill(
+                    label: '15m',
+                    onTap: () => widget.onExtendDuration(15),
+                  ),
+                  const SizedBox(width: 8),
+                  _DurationPill(
+                    label: 'Custom',
+                    onTap: () {
+                      setState(() {
+                        _isCustomSelected = true;
+                        _errorMessage = null;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ] else ...[
               Row(
                 children: [
                   Expanded(
@@ -150,157 +249,161 @@ class _TimedAccessExpiredSheetState extends State<TimedAccessExpiredSheet> {
                       controller: _customController,
                       keyboardType: TextInputType.number,
                       autofocus: true,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(2),
-                      ],
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: textColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      cursorColor: textColor,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'e.g. 15',
-                        hintStyle: TextStyle(
-                          color: secondaryColor.withValues(alpha: 0.5),
-                        ),
-                        suffixText: 'min',
-                        suffixStyle: TextStyle(
-                          color: secondaryColor,
-                          fontSize: 16,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        enabledBorder: OutlineInputBorder(
+                        hintText: 'Minutes (1-60)',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        filled: true,
+                        fillColor: const Color(0xFF222222),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: secondaryColor.withValues(alpha: 0.3),
-                          ),
+                          borderSide: const BorderSide(color: Colors.white38),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: textColor,
-                            width: 1.5,
-                          ),
+                          borderSide: const BorderSide(color: Colors.white),
                         ),
                       ),
                       onSubmitted: (_) => _submitCustom(),
-                      onChanged: (_) {
-                        if (_errorMessage != null) {
-                          setState(() => _errorMessage = null);
-                        }
-                      },
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: _submitCustom,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF222222) : const Color(0xFFE5E5E5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: MinimalText(
-                        'Start',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: textColor,
-                        ),
-                      ),
-                    ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _submitCustom,
+                    child: const Text('Start', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
               if (_errorMessage != null) ...[
-                const SizedBox(height: 8),
-                MinimalText(
-                  _errorMessage!,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.redAccent,
-                  ),
-                ),
+                const SizedBox(height: 4),
+                Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
               ],
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isCustomSelected = false;
-                    _errorMessage = null;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: MinimalText(
-                    '← Back to options',
+            ],
+          ],
+
+          const SizedBox(height: 24),
+
+          // ── Row 3: Time Remaining & Usage Stats ───────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Left: Time remaining 0 min
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Time remaining',
                     style: TextStyle(
                       fontSize: 14,
-                      color: secondaryColor,
+                      color: Color(0xFF9E9E9E),
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
-                ),
+                  SizedBox(height: 2),
+                  Text(
+                    '0 min',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Right: X h Y min spent today / last 7 days
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$_todaySpent ',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: 'spent today',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF9E9E9E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$_weekSpent ',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const TextSpan(
+                          text: 'last 7 days',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF9E9E9E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
-
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: widget.onDone,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: MinimalText(
-                    'Cancel / Done',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: secondaryColor,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _OptionTile extends StatelessWidget {
+class _DurationPill extends StatelessWidget {
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
-  const _OptionTile({
+  const _DurationPill({
     required this.label,
-    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: MinimalText(
-          label,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w400,
-            color: color,
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFF222222),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white38),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

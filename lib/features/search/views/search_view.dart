@@ -40,8 +40,12 @@ class _SearchViewState extends State<SearchView> {
     super.dispose();
   }
 
-  void _handleAutoLaunch(String query, AppSearchController searchController,
-      ProductivityController productivity, SettingsController settings) {
+  void _handleAutoLaunch(
+      String query,
+      AppSearchController searchController,
+      ProductivityController productivity,
+      SettingsController settings,
+      BuildContext context) {
     if (!settings.autoLaunchSingleMatch.value) return;
 
     final trimmed = query.trim();
@@ -52,12 +56,20 @@ class _SearchViewState extends State<SearchView> {
     if (searchController.results.length == 1) {
       final targetApp = searchController.results.first;
       HapticFeedback.lightImpact();
-      productivity.handleAppLaunch(targetApp.packageName);
+      productivity.handleAppLaunch(
+        targetApp.packageName,
+        userSerial: targetApp.userSerial,
+        activityName: targetApp.activityName,
+        context: context,
+      );
     }
   }
 
-  void _handleSubmit(String query, AppSearchController searchController,
-      ProductivityController productivity) {
+  void _handleSubmit(
+      String query,
+      AppSearchController searchController,
+      ProductivityController productivity,
+      BuildContext context) {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
 
@@ -72,8 +84,12 @@ class _SearchViewState extends State<SearchView> {
     }
 
     if (searchController.results.isNotEmpty) {
+      final target = searchController.results.first;
       productivity.handleAppLaunch(
-        searchController.results.first.packageName,
+        target.packageName,
+        userSerial: target.userSerial,
+        activityName: target.activityName,
+        context: context,
       );
     } else {
       // Web search fallback when no apps match
@@ -135,6 +151,7 @@ class _SearchViewState extends State<SearchView> {
                           searchController,
                           productivity,
                           settings,
+                          context,
                         );
                       },
                       textInputAction: TextInputAction.search,
@@ -142,6 +159,7 @@ class _SearchViewState extends State<SearchView> {
                         val,
                         searchController,
                         productivity,
+                        context,
                       ),
                     ),
                   ),
@@ -198,6 +216,7 @@ class _SearchViewState extends State<SearchView> {
                                 query,
                                 searchController,
                                 productivity,
+                                context,
                               ),
                               child: MinimalText(
                                 'Search web for "$query" ↵',
@@ -225,7 +244,12 @@ class _SearchViewState extends State<SearchView> {
                       return InkWell(
                         onTap: () {
                           HapticFeedback.lightImpact();
-                          productivity.handleAppLaunch(app.packageName);
+                          productivity.handleAppLaunch(
+                            app.packageName,
+                            userSerial: app.userSerial,
+                            activityName: app.activityName,
+                            context: context,
+                          );
                         },
                         borderRadius: BorderRadius.circular(4),
                         child: Padding(

@@ -50,6 +50,15 @@ class FakeNativeBridge extends GetxService implements NativeBridge {
   void Function(String packageName, String action)? onPackagesChanged;
 
   @override
+  void Function(String packageName)? onDistractionIntercepted;
+
+  @override
+  void Function(String packageName, int durationMinutes)? onSessionExtended;
+
+  @override
+  void Function(String packageName)? onBlockAppRequested;
+
+  @override
   Future<bool> isDefaultLauncher() async => false;
 
   @override
@@ -58,7 +67,10 @@ class FakeNativeBridge extends GetxService implements NativeBridge {
   @override
   Future<void> startTimedSession({
     required String packageName,
+    String? appName,
     required int durationSeconds,
+    int? startedAtMillis,
+    int? expiresAtMillis,
   }) async {}
 
   @override
@@ -66,6 +78,9 @@ class FakeNativeBridge extends GetxService implements NativeBridge {
 
   @override
   Future<void> returnToLauncher() async {}
+
+  @override
+  Future<void> syncDistractionPackages(List<String> packages) async {}
 
   @override
   Future<bool> isDeviceOwner() async => false;
@@ -141,6 +156,12 @@ class FakeNativeBridge extends GetxService implements NativeBridge {
 
   @override
   Future<void> openAccessibilitySettings() async {}
+
+  @override
+  Future<bool> hasOverlayPermission() async => true;
+
+  @override
+  Future<void> requestOverlayPermission() async {}
 
   @override
   Future<bool> openScreenTimeApp({String? customPackage}) async => true;

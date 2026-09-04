@@ -27,30 +27,6 @@ class HomeFavoritesWidget extends StatelessWidget {
     required this.onLongPressApp,
   });
 
-  CrossAxisAlignment _resolveCrossAxis(String alignment) {
-    switch (alignment) {
-      case 'center':
-        return CrossAxisAlignment.center;
-      case 'right':
-        return CrossAxisAlignment.end;
-      case 'left':
-      default:
-        return CrossAxisAlignment.start;
-    }
-  }
-
-  TextAlign _resolveTextAlign(String alignment) {
-    switch (alignment) {
-      case 'center':
-        return TextAlign.center;
-      case 'right':
-        return TextAlign.right;
-      case 'left':
-      default:
-        return TextAlign.left;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final settings = Get.find<SettingsController>();
@@ -65,11 +41,10 @@ class HomeFavoritesWidget extends StatelessWidget {
         return const SizedBox.shrink();
       }
 
-      final alignment = settings.homeAlignment.value;
-      final isBottom = settings.homeBottomAlignment.value;
       final isBold = settings.boldFont.value;
-      final crossAxis = _resolveCrossAxis(alignment);
-      final textAlign = _resolveTextAlign(alignment);
+      final crossAxis = settings.currentCrossAxisAlignment;
+      final textAlign = settings.currentTextAlign;
+      final scale = settings.textScale.value;
 
       if (favorites.isEmpty) {
         return Center(
@@ -80,7 +55,7 @@ class HomeFavoritesWidget extends StatelessWidget {
                 'No favorite apps yet',
                 style: TextStyle(
                   color: textColor,
-                  fontSize: 18,
+                  fontSize: 18 * scale,
                   fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
                 ),
               ),
@@ -90,7 +65,7 @@ class HomeFavoritesWidget extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: secondaryColor.withValues(alpha: 0.7),
-                  fontSize: 14,
+                  fontSize: 14 * scale,
                   height: 1.4,
                 ),
               ),
@@ -114,6 +89,7 @@ class HomeFavoritesWidget extends StatelessWidget {
                 app.packageName,
                 userSerial: app.userSerial,
                 activityName: app.activityName,
+                context: context,
               );
             },
             onLongPress: () => onLongPressApp(context, app, name),
@@ -124,7 +100,7 @@ class HomeFavoritesWidget extends StatelessWidget {
                 '$name$badge',
                 textAlign: textAlign,
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 20 * scale,
                   fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
                   color: textColor,
                   letterSpacing: 0.2,
@@ -136,7 +112,7 @@ class HomeFavoritesWidget extends StatelessWidget {
       }).toList();
 
       return Align(
-        alignment: isBottom ? Alignment.bottomCenter : Alignment.center,
+        alignment: settings.currentFavoritesAlignment,
         child: SingleChildScrollView(
           physics: const NeverScrollableScrollPhysics(),
           child: Column(

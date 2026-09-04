@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../core/routes/app_router.dart';
 import '../../../core/services/native_bridge.dart';
 import '../../apps/controllers/apps_controller.dart';
 import '../../apps/models/app_info.dart';
 import '../../apps/services/native_app_service.dart';
+import '../../focus_mode/controllers/focus_mode_controller.dart';
 import '../models/timed_app_session.dart';
 import '../services/timed_access_service.dart';
 import '../views/timed_access_expired_sheet.dart';
@@ -24,6 +26,8 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
   TimedAppSession? _lastExpiredSession;
   Timer? _countdownTicker;
   bool _isExpiredSheetShowing = false;
+  String? _pendingExpiredPackage;
+  String? _pendingExpiredAppName;
 
   @override
   void onInit() {
@@ -33,6 +37,42 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     // Wire up native callback
     _nativeBridge.onSessionExpired = (packageName) {
       handleSessionExpired(expiredPackage: packageName);
+    };
+
+    // Wire up native callback when user taps [Extend] in the overlay
+    _nativeBridge.onSessionExtended = (packageName, durationMinutes) async {
+      final appName = currentSession.value?.appName ?? _lastExpiredSession?.appName ?? packageName;
+      final session = await _service.startSession(
+        packageName: packageName,
+        appName: appName,
+        durationMinutes: durationMinutes,
+      );
+      currentSession.value = session;
+      remainingSeconds.value = session.remainingSeconds;
+      isExpired.value = false;
+      _lastExpiredSession = null;
+      _startCountdownTicker();
+    };
+
+    // Wire up native callback when user taps [Block App] in the overlay
+    _nativeBridge.onBlockAppRequested = (packageName) async {
+      if (Get.isRegistered<FocusModeController>()) {
+        final focusCtrl = Get.find<FocusModeController>();
+        await focusCtrl.toggleBlockedApp(packageName);
+      }
+    };
+
+    // Wire up native callback for notification interception of distraction apps
+    _nativeBridge.onDistractionIntercepted = (packageName) {
+      if (hasActiveSessionFor(packageName)) return;
+      final appsCtrl = Get.isRegistered<AppsController>() ? Get.find<AppsController>() : null;
+      final app = appsCtrl?.findByPackage(packageName);
+      if (app != null) {
+        final context = AppRouter.rootNavigatorKey.currentContext ?? Get.context;
+        if (context != null && context.mounted) {
+          handleDistractionLaunch(context: context, app: app);
+        }
+      }
     };
 
     // Restore any active session
@@ -57,6 +97,13 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       recalculateRemainingTime();
+      if (_pendingExpiredPackage != null) {
+        final pkg = _pendingExpiredPackage!;
+        final name = _pendingExpiredAppName ?? pkg;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showExpiredSheet(packageName: pkg, appName: name);
+        });
+      }
     }
   }
 
@@ -89,7 +136,8 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
 
       if (secs <= 0) {
         _countdownTicker?.cancel();
-        handleSessionExpired(expiredPackage: session.packageName);
+        remainingSeconds.value = 0;
+        isExpired.value = true;
       }
     });
   }
@@ -188,10 +236,13 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     isExpired.value = false;
     _lastExpiredSession = null;
 
-    // Start native monitoring timer
+    // Start native monitoring timer with ongoing live countdown notification and usage overlay
     await _nativeBridge.startTimedSession(
       packageName: app.packageName,
-      durationSeconds: session.remainingSeconds,
+      appName: displayName,
+      durationSeconds: sanitizedMinutes * 60,
+      startedAtMillis: session.startedAt.millisecondsSinceEpoch,
+      expiresAtMillis: session.expiresAt.millisecondsSinceEpoch,
     );
 
     _startCountdownTicker();
@@ -199,7 +250,7 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
   }
 
   /// Triggered when the timed session expires (from native bridge, ticker, or resume).
-  void handleSessionExpired({String? expiredPackage}) {
+  void handleSessionExpired({String? expiredPackage, bool showSheet = false}) {
     _countdownTicker?.cancel();
 
     final session = currentSession.value ??
@@ -227,8 +278,10 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     _nativeBridge.cancelTimedSession();
     _nativeBridge.returnToLauncher();
 
-    // Show "Your time is up. Need more time?" sheet
-    _showExpiredSheet(packageName: pkg, appName: name);
+    // Show "Your time is up. Need more time?" sheet only if requested
+    if (showSheet) {
+      _showExpiredSheet(packageName: pkg, appName: name);
+    }
   }
 
   void _handleStoredExpiredSession(TimedAppSession session) {
@@ -237,6 +290,9 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     currentSession.value = null;
     remainingSeconds.value = 0;
     isExpired.value = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showExpiredSheet(packageName: session.packageName, appName: session.appName);
+    });
   }
 
   void _showExpiredSheet({
@@ -245,40 +301,43 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
   }) {
     if (_isExpiredSheetShowing) return;
 
-    final context = Get.context;
-    if (context == null) return;
+    final context = AppRouter.rootNavigatorKey.currentContext ?? Get.context;
+    if (context == null || !context.mounted) {
+      _pendingExpiredPackage = packageName;
+      _pendingExpiredAppName = appName;
+      return;
+    }
 
     _isExpiredSheetShowing = true;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    _pendingExpiredPackage = null;
+    _pendingExpiredAppName = null;
 
-    showModalBottomSheet<void>(
+    showDialog<void>(
       context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor:
-          isDark ? const Color(0xFF111111) : const Color(0xFFF5F5F5),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return TimedAccessExpiredSheet(
-          appName: appName,
-          packageName: packageName,
-          onExtendDuration: (extraMinutes) async {
-            Navigator.pop(sheetContext);
-            _isExpiredSheetShowing = false;
-            await _extendSessionAndLaunch(
-              packageName: packageName,
-              appName: appName,
-              durationMinutes: extraMinutes,
-            );
-          },
-          onDone: () {
-            Navigator.pop(sheetContext);
-            _isExpiredSheetShowing = false;
-            dismissExpiredSession();
-          },
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.75),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TimedAccessExpiredSheet(
+            appName: appName,
+            packageName: packageName,
+            onExtendDuration: (extraMinutes) async {
+              Navigator.pop(dialogContext);
+              _isExpiredSheetShowing = false;
+              await _extendSessionAndLaunch(
+                packageName: packageName,
+                appName: appName,
+                durationMinutes: extraMinutes,
+              );
+            },
+            onDone: () {
+              Navigator.pop(dialogContext);
+              _isExpiredSheetShowing = false;
+              dismissExpiredSession();
+            },
+          ),
         );
       },
     ).then((_) {

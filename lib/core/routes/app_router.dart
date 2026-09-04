@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:get/get.dart';
 import '../../features/launcher/views/launcher_home_view.dart';
@@ -36,6 +37,9 @@ import '../services/permission_service.dart';
 import 'app_routes.dart';
 
 class AppRouter {
+  static final GlobalKey<NavigatorState> rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+
   static String _determineInitialLocation() {
     if (Get.isRegistered<OnboardingService>() &&
         !Get.find<OnboardingService>().isOnboardingCompleted) {
@@ -45,6 +49,7 @@ class AppRouter {
   }
 
   static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: _determineInitialLocation(),
     redirect: (context, state) {
       if (!Get.isRegistered<OnboardingService>()) return null;

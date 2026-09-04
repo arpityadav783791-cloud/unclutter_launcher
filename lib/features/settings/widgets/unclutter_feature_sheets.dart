@@ -19,7 +19,7 @@ void showMindfulDelaySettingsSheet(BuildContext context) {
   final textColor = isDark ? AppColors.darkText : AppColors.lightText;
   final secondaryColor =
       isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? const Color(0xFF111111) : const Color(0xFFF9F9F9);
+  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
 
   final delayService = Get.find<MindfulDelayService>();
   final appsController = Get.find<AppsController>();
@@ -150,7 +150,7 @@ void showDailyLimitsSettingsSheet(BuildContext context) {
   final textColor = isDark ? AppColors.darkText : AppColors.lightText;
   final secondaryColor =
       isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? const Color(0xFF111111) : const Color(0xFFF9F9F9);
+  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
 
   final limitService = Get.find<DailyLimitService>();
   final appsController = Get.find<AppsController>();
@@ -407,7 +407,7 @@ void showHiddenAppsManagerSheet(BuildContext context) {
   final textColor = isDark ? AppColors.darkText : AppColors.lightText;
   final secondaryColor =
       isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? const Color(0xFF111111) : const Color(0xFFF9F9F9);
+  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
 
   final configService = Get.find<AppConfigService>();
   final appsController = Get.find<AppsController>();
@@ -537,7 +537,7 @@ void showFavoritesManagerSheet(BuildContext context) {
   final textColor = isDark ? AppColors.darkText : AppColors.lightText;
   final secondaryColor =
       isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? const Color(0xFF111111) : const Color(0xFFF9F9F9);
+  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
 
   final favoritesController = Get.find<FavoritesController>();
   final appsController = Get.find<AppsController>();
@@ -685,7 +685,7 @@ void _showAddFavoritePicker(
 ) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final bgColor = isDark ? const Color(0xFF161616) : Colors.white;
+  final bgColor = isDark ? AppColors.darkBackground : Colors.white;
 
   showDialog(
     context: context,
@@ -735,7 +735,7 @@ void showRenamedAppsManagerSheet(BuildContext context) {
   final textColor = isDark ? AppColors.darkText : AppColors.lightText;
   final secondaryColor =
       isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? const Color(0xFF111111) : const Color(0xFFF9F9F9);
+  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
 
   final configService = Get.find<AppConfigService>();
   final appsController = Get.find<AppsController>();

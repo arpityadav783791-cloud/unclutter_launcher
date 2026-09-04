@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:minimal_launcher/core/services/storage_service.dart';
@@ -214,6 +215,25 @@ void main() {
       expect(controller.eInkModeLabel, 'Off');
       await controller.cycleEInkMode();
       expect(controller.eInkMode.value, 'auto');
+
+      // Alignment getters validation (DRY verification)
+      await controller.setHomeAlignment('left');
+      expect(controller.currentCrossAxisAlignment, CrossAxisAlignment.start);
+      expect(controller.currentTextAlign, TextAlign.left);
+      expect(controller.currentFavoritesAlignment, Alignment.centerLeft);
+
+      await controller.toggleHomeBottomAlignment();
+      expect(controller.currentFavoritesAlignment, Alignment.bottomLeft);
+
+      await controller.setHomeAlignment('center');
+      expect(controller.currentCrossAxisAlignment, CrossAxisAlignment.center);
+      expect(controller.currentTextAlign, TextAlign.center);
+      expect(controller.currentFavoritesAlignment, Alignment.bottomCenter);
+
+      await controller.setHomeAlignment('right');
+      expect(controller.currentCrossAxisAlignment, CrossAxisAlignment.end);
+      expect(controller.currentTextAlign, TextAlign.right);
+      expect(controller.currentFavoritesAlignment, Alignment.bottomRight);
 
       Get.delete<SettingsController>();
       Get.delete<SettingsService>();

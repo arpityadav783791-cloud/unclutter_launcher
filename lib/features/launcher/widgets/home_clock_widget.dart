@@ -22,30 +22,6 @@ class HomeClockWidget extends StatelessWidget {
     required this.onLongPress,
   });
 
-  CrossAxisAlignment _resolveCrossAxis(String alignment) {
-    switch (alignment) {
-      case 'center':
-        return CrossAxisAlignment.center;
-      case 'right':
-        return CrossAxisAlignment.end;
-      case 'left':
-      default:
-        return CrossAxisAlignment.start;
-    }
-  }
-
-  TextAlign _resolveTextAlign(String alignment) {
-    switch (alignment) {
-      case 'center':
-        return TextAlign.center;
-      case 'right':
-        return TextAlign.right;
-      case 'left':
-      default:
-        return TextAlign.left;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final settings = Get.find<SettingsController>();
@@ -58,9 +34,8 @@ class HomeClockWidget extends StatelessWidget {
       final showClock = !isDateOnly && settings.showClock.value;
       final showDate = settings.showDate.value;
       final showScreenTime = settings.showScreenTime.value;
-      final alignment = settings.homeAlignment.value;
-      final crossAxis = _resolveCrossAxis(alignment);
-      final textAlign = _resolveTextAlign(alignment);
+      final crossAxis = settings.currentCrossAxisAlignment;
+      final textAlign = settings.currentTextAlign;
       final isBold = settings.boldFont.value;
 
       final batteryText = (!settings.showStatusBar.value &&

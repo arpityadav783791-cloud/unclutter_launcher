@@ -76,4 +76,24 @@ class PermissionService extends GetxService {
   Future<bool> enableProtection() async {
     return await _nativeBridge.enableProtectedMode();
   }
+
+  /// Checks if Accessibility Service is enabled (used for Double Tap to Lock)
+  Future<bool> checkAccessibilityPermission() async {
+    return await _nativeBridge.isAccessibilityServiceEnabled();
+  }
+
+  /// Opens the system Accessibility settings screen
+  Future<void> openAccessibilitySettings() async {
+    await _nativeBridge.openAccessibilitySettings();
+  }
+
+  /// Checks if overlay drawing is permitted (via Accessibility or SYSTEM_ALERT_WINDOW)
+  Future<bool> checkOverlayPermission() async {
+    return await _nativeBridge.hasOverlayPermission();
+  }
+
+  /// Requests overlay / accessibility permission
+  Future<void> requestOverlayPermission() async {
+    await _nativeBridge.requestOverlayPermission();
+  }
 }

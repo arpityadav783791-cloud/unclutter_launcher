@@ -27,7 +27,7 @@ void showAppRenameDialog({
     builder: (ctx) {
       return AlertDialog(
         backgroundColor:
-            isDark ? const Color(0xFF111111) : const Color(0xFFF5F5F5),
+            isDark ? AppColors.darkBackground : const Color(0xFFF5F5F5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: MinimalText(
           'Rename',
