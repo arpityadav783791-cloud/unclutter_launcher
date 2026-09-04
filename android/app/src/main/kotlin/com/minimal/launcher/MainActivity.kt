@@ -1547,6 +1547,54 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {}
     }
 
+    fun updateSessionExpiry(packageName: String, appName: String, newExpiresAt: Long) {
+        sessionHandler.removeCallbacks(sessionExpiryRunnable)
+        activeSessionPackage = packageName
+        activeSessionAppName = appName
+        activeSessionExpiryMillis = newExpiresAt
+        MyAccessibilityService.clearExpiredPackage()
+
+        // 1. Live Chronometer Ongoing Notification in status bar
+        showSessionCountdownNotification(packageName, appName, activeSessionExpiryMillis)
+
+        // 2. In-process timer as backup
+        val delayMillis = (activeSessionExpiryMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        sessionHandler.postDelayed(sessionExpiryRunnable, delayMillis)
+
+        // 3. AlarmManager broadcast to SessionExpiryReceiver
+        try {
+            val am = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            sessionExpiryPendingIntent?.let { am?.cancel(it) }
+            val intent = Intent(this, SessionExpiryReceiver::class.java).apply {
+                action = SessionExpiryReceiver.ACTION_SESSION_EXPIRED
+                putExtra(SessionExpiryReceiver.EXTRA_PACKAGE_NAME, packageName)
+                putExtra(SessionExpiryReceiver.EXTRA_APP_NAME, appName)
+            }
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            } else {
+                PendingIntent.FLAG_UPDATE_CURRENT
+            }
+            val pi = PendingIntent.getBroadcast(this, 9992, intent, flags)
+            sessionExpiryPendingIntent = pi
+            if (pi != null && am != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    am.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        activeSessionExpiryMillis,
+                        pi
+                    )
+                } else {
+                    am.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        activeSessionExpiryMillis,
+                        pi
+                    )
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     fun cancelActiveTimedSession() {
         cancelTimedSession()
         runOnUiThread {

@@ -5,6 +5,7 @@ import '../../../core/routes/app_router.dart';
 import '../../../core/services/native_bridge.dart';
 import '../../apps/controllers/apps_controller.dart';
 import '../../apps/models/app_info.dart';
+import '../../apps/services/app_config_service.dart';
 import '../../apps/services/native_app_service.dart';
 import '../../focus_mode/controllers/focus_mode_controller.dart';
 import '../models/timed_app_session.dart';
@@ -33,6 +34,14 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
+
+    // Sync distraction package list to native service to ensure accessibility service
+    // intercepts unprompted launches even after fresh restart
+    if (Get.isRegistered<AppConfigService>()) {
+      _nativeBridge.syncDistractionPackages(
+        Get.find<AppConfigService>().distractionPackageNames,
+      );
+    }
 
     // Wire up native callback
     _nativeBridge.onSessionExpired = (packageName) {
@@ -207,22 +216,7 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     required String displayName,
     required int durationMinutes,
   }) async {
-    // Validate duration: 1 to 60 minutes
     final sanitizedMinutes = durationMinutes.clamp(1, 60);
-
-    // Launch target app
-    final success = await _nativeAppService.launchApp(app.packageName);
-    if (!success) {
-      Get.rawSnackbar(
-        message: 'Could not open $displayName',
-        duration: const Duration(seconds: 2),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: const Color(0xFF222222),
-        borderRadius: 8,
-        margin: const EdgeInsets.all(16),
-      );
-      return false;
-    }
 
     // Start session
     final session = await _service.startSession(
@@ -237,6 +231,8 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
     _lastExpiredSession = null;
 
     // Start native monitoring timer with ongoing live countdown notification and usage overlay
+    // BEFORE launching the target app so that AccessibilityService immediately recognizes the session
+    // and clears any expired package lock!
     await _nativeBridge.startTimedSession(
       packageName: app.packageName,
       appName: displayName,
@@ -244,6 +240,21 @@ class TimedAccessController extends GetxController with WidgetsBindingObserver {
       startedAtMillis: session.startedAt.millisecondsSinceEpoch,
       expiresAtMillis: session.expiresAt.millisecondsSinceEpoch,
     );
+
+    // Launch target app
+    final success = await _nativeAppService.launchApp(app.packageName);
+    if (!success) {
+      Get.rawSnackbar(
+        message: 'Could not open $displayName',
+        duration: const Duration(seconds: 2),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFF222222),
+        borderRadius: 8,
+        margin: const EdgeInsets.all(16),
+      );
+      await cancelSession();
+      return false;
+    }
 
     _startCountdownTicker();
     return true;

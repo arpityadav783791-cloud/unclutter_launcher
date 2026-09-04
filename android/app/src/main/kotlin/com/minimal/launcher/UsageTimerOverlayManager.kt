@@ -14,6 +14,7 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -158,7 +159,7 @@ object UsageTimerOverlayManager {
 
         MainActivity.instance?.let { act ->
             act.notifySessionExtended(target, minutes)
-            act.showSessionCountdownNotification(target, name, newExpires)
+            act.updateSessionExpiry(target, name, newExpires)
         }
     }
 
@@ -504,14 +505,13 @@ object UsageTimerOverlayManager {
         // Hide the thin top bar
         timerBarContainer?.visibility = View.GONE
 
-        // Update WindowManager layout to full screen and remove FLAG_NOT_TOUCHABLE so modal is interactive
+        // Update WindowManager layout to full screen and remove FLAG_NOT_TOUCHABLE and FLAG_NOT_FOCUSABLE so modal is interactive and can intercept Back key
         try {
             val lp = root.layoutParams as? WindowManager.LayoutParams
             if (lp != null) {
                 lp.width = WindowManager.LayoutParams.MATCH_PARENT
                 lp.height = WindowManager.LayoutParams.MATCH_PARENT
-                lp.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                lp.flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                 wm.updateViewLayout(root, lp)
             }
@@ -536,7 +536,18 @@ object UsageTimerOverlayManager {
             )
             setBackgroundColor(Color.parseColor("#B3000000")) // 70% dim black scrim
             isClickable = true
-            isFocusable = false
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setOnKeyListener { _, keyCode, event ->
+                if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                    Log.d(TAG, "Back key pressed on expired overlay: terminating $targetPackage")
+                    stopSession()
+                    MainActivity.instance?.terminateTargetApp(targetPackage)
+                    true
+                } else {
+                    false
+                }
+            }
         }
 
         // 2. Floating Card (matching screenshot)
@@ -743,8 +754,8 @@ object UsageTimerOverlayManager {
         row3.addView(colLeft)
 
         // Query usage stats from MainActivity
-        var todayStr = "1 h 56 min"
-        var weekStr = "15 h 10 min"
+        var todayStr = "0 min"
+        var weekStr = "0 min"
         try {
             val usageMap = MainActivity.instance?.getAppUsage(targetPackage)
             val todayMs = (usageMap?.get("todayMs") as? Number)?.toLong() ?: 0L
@@ -791,6 +802,7 @@ object UsageTimerOverlayManager {
         container.addView(card)
         root.addView(container)
         expiredContainer = container
+        container.requestFocus()
     }
 
     private fun formatDuration(ms: Long): String {
