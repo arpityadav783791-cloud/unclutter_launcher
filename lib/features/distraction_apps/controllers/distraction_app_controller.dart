@@ -27,7 +27,7 @@ class DistractionAppController extends GetxController {
     distractionApps.assignAll(_service.getDistractionApps(all));
   }
 
-  /// Toggles an app between ON (Timed Access enforced) and OFF (normal launch).
+  /// Toggles an app between enabled (distraction rules enforced) and disabled (normal launch).
   Future<void> toggleApp(String packageName) async {
     final current = distractionApps.firstWhereOrNull((a) => a.packageName == packageName);
     final newState = current != null ? !current.isEnabled : true;

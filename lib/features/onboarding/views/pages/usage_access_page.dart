@@ -117,7 +117,7 @@ class UsageAccessPage extends StatelessWidget {
                 ),
               ),
               child: MinimalText(
-                'Without Usage Access, screen-time statistics and daily limits may not function, but you can still use the launcher and timed app access.',
+                'Without Usage Access, screen-time statistics and daily limits may not function, but you can still use the launcher.',
                 style: TextStyle(
                   fontSize: 14,
                   color: secondaryColor,

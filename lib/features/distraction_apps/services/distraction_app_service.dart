@@ -132,7 +132,7 @@ class DistractionAppService extends GetxService {
 
   /// User overrides an app's distraction status:
   /// - If [enable] is false: app is excluded and launches normally.
-  /// - If [enable] is true: app is included in timed distraction access.
+  /// - If [enable] is true: app is marked as a distraction.
   Future<void> toggleDistraction(
     String packageName, {
     required bool enable,

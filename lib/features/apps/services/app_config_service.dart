@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:get/get.dart';
-import '../../../core/services/native_bridge.dart';
 import '../../../core/services/storage_service.dart';
 import '../models/app_config.dart';
 import '../models/app_info.dart';
@@ -35,21 +34,11 @@ class AppConfigService extends GetxService {
     } catch (_) {
       _cache = {};
     }
-    _syncWithNative();
-  }
-
-  void _syncWithNative() {
-    try {
-      if (Get.isRegistered<NativeBridge>()) {
-        Get.find<NativeBridge>().syncDistractionPackages(distractionPackageNames);
-      }
-    } catch (_) {}
   }
 
   Future<void> _save() async {
     final list = _cache.values.map((e) => e.toMap()).toList();
     await _storage.setString(_key, jsonEncode(list));
-    _syncWithNative();
   }
 
   AppConfig getConfig(String packageName) {

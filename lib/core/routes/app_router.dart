@@ -24,8 +24,6 @@ import '../../features/scheduled_block/controllers/schedule_controller.dart';
 import '../../features/settings/services/settings_service.dart';
 import '../../features/settings/controllers/settings_controller.dart';
 import '../../features/settings/views/settings_view.dart';
-import '../../features/timed_access/services/timed_access_service.dart';
-import '../../features/timed_access/controllers/timed_access_controller.dart';
 import '../../features/protected_mode/services/protected_mode_service.dart';
 import '../../features/protected_mode/controllers/protected_mode_controller.dart';
 import '../../features/protected_mode/views/protected_mode_view.dart';
@@ -192,12 +190,6 @@ class AppRouter {
     }
     if (!Get.isRegistered<SettingsController>()) {
       Get.put(SettingsController(), permanent: true);
-    }
-    if (!Get.isRegistered<TimedAccessService>()) {
-      Get.put(TimedAccessService(), permanent: true);
-    }
-    if (!Get.isRegistered<TimedAccessController>()) {
-      Get.put(TimedAccessController(), permanent: true);
     }
     if (!Get.isRegistered<ProtectedModeService>()) {
       Get.put(ProtectedModeService(), permanent: true);

@@ -61,14 +61,6 @@ class MainActivity : FlutterActivity() {
     private var pendingNotificationResult: MethodChannel.Result? = null
     private val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
 
-    private var activeSessionPackage: String? = null
-    private var activeSessionAppName: String? = null
-    private var activeSessionExpiryMillis: Long = 0L
-    private var sessionExpiryPendingIntent: PendingIntent? = null
-    private val sessionHandler = Handler(Looper.getMainLooper())
-    private val sessionExpiryRunnable = Runnable {
-        enforceSessionExpiration()
-    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -134,27 +126,8 @@ class MainActivity : FlutterActivity() {
                     "getWeeklyUsage" -> {
                         result.success(getWeeklyUsage())
                     }
-                    // ── Timed Distraction Access ──────────────────
-                    "startTimedSession" -> {
-                        val packageName = call.argument<String>("packageName") ?: ""
-                        val appName = call.argument<String>("appName")
-                        val durationSeconds = call.argument<Int>("durationSeconds") ?: 0
-                        val startedAt = call.argument<Number>("startedAtMillis")?.toLong() ?: System.currentTimeMillis()
-                        val expiresAt = call.argument<Number>("expiresAtMillis")?.toLong() ?: (startedAt + durationSeconds * 1000L)
-                        startTimedSession(packageName, appName, durationSeconds, startedAt, expiresAt)
-                        result.success(null)
-                    }
-                    "cancelTimedSession" -> {
-                        cancelTimedSession()
-                        result.success(null)
-                    }
                     "returnToLauncher" -> {
                         returnToLauncher()
-                        result.success(null)
-                    }
-                    "setDistractionPackages" -> {
-                        val pkgs = call.argument<List<String>>("packages") ?: emptyList()
-                        MyAccessibilityService.distractionPackages = pkgs.toSet()
                         result.success(null)
                     }
                     // ── Protected Mode ────────────────────────────
@@ -1427,208 +1400,6 @@ class MainActivity : FlutterActivity() {
         // Launchers should not close on back press
     }
 
-    // ── Timed Session Enforcement ─────────────────────────────
-
-    fun showSessionCountdownNotification(packageName: String, appName: String, expiryMillis: Long) {
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                SessionExpiryReceiver.CHANNEL_ID_TIMER,
-                "Timed Detox Session",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows live remaining time for distraction apps"
-                setShowBadge(false)
-            }
-            nm.createNotificationChannel(channel)
-        }
-
-        val contentIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
-        val contentPendingIntent = PendingIntent.getActivity(this, 9994, contentIntent, piFlags)
-
-        val endIntent = Intent(this, SessionExpiryReceiver::class.java).apply {
-            action = SessionExpiryReceiver.ACTION_END_SESSION
-            putExtra(SessionExpiryReceiver.EXTRA_PACKAGE_NAME, packageName)
-            putExtra(SessionExpiryReceiver.EXTRA_APP_NAME, appName)
-        }
-        val endPendingIntent = PendingIntent.getBroadcast(this, 9995, endIntent, piFlags)
-
-        val builder = NotificationCompat.Builder(this, SessionExpiryReceiver.CHANNEL_ID_TIMER)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Detox: $appName")
-            .setContentText("Timed access active")
-            .setUsesChronometer(true)
-            .setChronometerCountDown(true)
-            .setWhen(expiryMillis)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(contentPendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End Now", endPendingIntent)
-
-        nm.notify(SessionExpiryReceiver.NOTIFICATION_ID_COUNTDOWN, builder.build())
-    }
-
-    private fun startTimedSession(
-        packageName: String,
-        appName: String?,
-        durationSeconds: Int,
-        startedAt: Long,
-        expiresAt: Long
-    ) {
-        sessionHandler.removeCallbacks(sessionExpiryRunnable)
-        activeSessionPackage = packageName
-        val resolvedAppName = if (!appName.isNullOrBlank()) {
-            appName
-        } else {
-            try {
-                val appInfo = packageManager.getApplicationInfo(packageName, 0)
-                packageManager.getApplicationLabel(appInfo).toString()
-            } catch (_: Exception) {
-                packageName
-            }
-        }
-        activeSessionAppName = resolvedAppName
-        activeSessionExpiryMillis = expiresAt
-        MyAccessibilityService.clearExpiredPackage()
-
-        // 1. Live Chronometer Ongoing Notification in status bar
-        showSessionCountdownNotification(packageName, resolvedAppName, activeSessionExpiryMillis)
-
-        // 2. Non-intrusive, non-blocking Usage Timer Overlay over the distraction app
-        UsageTimerOverlayManager.startSession(
-            this,
-            packageName,
-            resolvedAppName,
-            startedAt,
-            expiresAt
-        )
-
-        // 3. In-process timer as backup
-        val delayMillis = (expiresAt - System.currentTimeMillis()).coerceAtLeast(0L)
-        sessionHandler.postDelayed(sessionExpiryRunnable, delayMillis)
-
-        // 4. AlarmManager broadcast to SessionExpiryReceiver (wakes up even from Doze/background)
-        try {
-            val am = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-            val intent = Intent(this, SessionExpiryReceiver::class.java).apply {
-                action = SessionExpiryReceiver.ACTION_SESSION_EXPIRED
-                putExtra(SessionExpiryReceiver.EXTRA_PACKAGE_NAME, packageName)
-                putExtra(SessionExpiryReceiver.EXTRA_APP_NAME, resolvedAppName)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val pi = PendingIntent.getBroadcast(this, 9992, intent, flags)
-            sessionExpiryPendingIntent = pi
-            if (pi != null && am != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    am.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        activeSessionExpiryMillis,
-                        pi
-                    )
-                } else {
-                    am.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        activeSessionExpiryMillis,
-                        pi
-                    )
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    fun updateSessionExpiry(packageName: String, appName: String, newExpiresAt: Long) {
-        sessionHandler.removeCallbacks(sessionExpiryRunnable)
-        activeSessionPackage = packageName
-        activeSessionAppName = appName
-        activeSessionExpiryMillis = newExpiresAt
-        MyAccessibilityService.clearExpiredPackage()
-
-        // 1. Live Chronometer Ongoing Notification in status bar
-        showSessionCountdownNotification(packageName, appName, activeSessionExpiryMillis)
-
-        // 2. In-process timer as backup
-        val delayMillis = (activeSessionExpiryMillis - System.currentTimeMillis()).coerceAtLeast(0L)
-        sessionHandler.postDelayed(sessionExpiryRunnable, delayMillis)
-
-        // 3. AlarmManager broadcast to SessionExpiryReceiver
-        try {
-            val am = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-            sessionExpiryPendingIntent?.let { am?.cancel(it) }
-            val intent = Intent(this, SessionExpiryReceiver::class.java).apply {
-                action = SessionExpiryReceiver.ACTION_SESSION_EXPIRED
-                putExtra(SessionExpiryReceiver.EXTRA_PACKAGE_NAME, packageName)
-                putExtra(SessionExpiryReceiver.EXTRA_APP_NAME, appName)
-            }
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
-            }
-            val pi = PendingIntent.getBroadcast(this, 9992, intent, flags)
-            sessionExpiryPendingIntent = pi
-            if (pi != null && am != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    am.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        activeSessionExpiryMillis,
-                        pi
-                    )
-                } else {
-                    am.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        activeSessionExpiryMillis,
-                        pi
-                    )
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    fun cancelActiveTimedSession() {
-        cancelTimedSession()
-        runOnUiThread {
-            methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to ""))
-        }
-    }
-
-    fun onSessionExpiredFromNative(packageName: String) {
-        runOnUiThread {
-            methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to packageName))
-        }
-    }
-
-    private fun cancelTimedSession() {
-        sessionHandler.removeCallbacks(sessionExpiryRunnable)
-        try {
-            val am = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-            sessionExpiryPendingIntent?.let { am?.cancel(it) }
-            sessionExpiryPendingIntent = null
-        } catch (_: Exception) {}
-
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        nm?.cancel(SessionExpiryReceiver.NOTIFICATION_ID_COUNTDOWN)
-
-        UsageTimerOverlayManager.stopSession()
-
-        activeSessionPackage = null
-        activeSessionAppName = null
-        activeSessionExpiryMillis = 0L
-        MyAccessibilityService.clearExpiredPackage()
-    }
-
     private fun returnToLauncher() {
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -1642,144 +1413,6 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {}
     }
 
-    fun pauseMediaPlayback() {
-        try {
-            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-            // 1. Dispatch media pause & stop key events
-            val pauseDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE)
-            val pauseUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE)
-            audioManager.dispatchMediaKeyEvent(pauseDown)
-            audioManager.dispatchMediaKeyEvent(pauseUp)
-
-            val stopDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_STOP)
-            val stopUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_STOP)
-            audioManager.dispatchMediaKeyEvent(stopDown)
-            audioManager.dispatchMediaKeyEvent(stopUp)
-
-            // 2. Request transient audio focus gain to force YouTube/media to stop playing
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .build()
-                    )
-                    .build()
-                audioManager.requestAudioFocus(focusRequest)
-            } else {
-                @Suppress("DEPRECATION")
-                audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-            }
-        } catch (e: Exception) {
-            Log.w("MainActivity", "pauseMediaPlayback error: ${e.message}")
-        }
-    }
-
-    private fun enforceSessionExpiration() {
-        val expiredPkg = activeSessionPackage ?: ""
-        val expiredName = activeSessionAppName ?: expiredPkg
-
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        nm?.cancel(SessionExpiryReceiver.NOTIFICATION_ID_COUNTDOWN)
-
-        UsageTimerOverlayManager.stopSession()
-
-        activeSessionPackage = null
-        activeSessionAppName = null
-        activeSessionExpiryMillis = 0L
-
-        // Active native enforcement & Picture-in-Picture prevention:
-        // 1. Pause media playback and steal audio focus
-        pauseMediaPlayback()
-
-        // 2. Accessibility enforcement: lock package, press Back (closes YouTube player), then go Home
-        if (expiredPkg.isNotEmpty()) {
-            MyAccessibilityService.setExpiredPackage(expiredPkg)
-            MyAccessibilityService.pressBack()
-        }
-        MyAccessibilityService.goHome()
-
-        // 3. Dismiss any active PiP
-        if (expiredPkg.isNotEmpty()) {
-            MyAccessibilityService.dismissPipIfActive(expiredPkg)
-        }
-
-        // 4. Terminate background processes for the target distraction package
-        if (expiredPkg.isNotEmpty()) {
-            try {
-                val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                am?.killBackgroundProcesses(expiredPkg)
-            } catch (_: Exception) {}
-
-            try {
-                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-                val admin = ComponentName(this, ProtectedDeviceAdminReceiver::class.java)
-                if (dpm != null && dpm.isDeviceOwnerApp(packageName)) {
-                    dpm.setApplicationHidden(admin, expiredPkg, true)
-                    dpm.setApplicationHidden(admin, expiredPkg, false)
-                }
-            } catch (_: Exception) {}
-        }
-
-        // 5. Return to launcher
-        returnToLauncher()
-
-        // 6. Post-check after 250ms and 500ms to dismiss any asynchronously spawned PiP windows
-        if (expiredPkg.isNotEmpty()) {
-            Handler(Looper.getMainLooper()).postDelayed({
-                MyAccessibilityService.dismissPipIfActive(expiredPkg)
-                try {
-                    val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                    am?.killBackgroundProcesses(expiredPkg)
-                } catch (_: Exception) {}
-            }, 250L)
-            Handler(Looper.getMainLooper()).postDelayed({
-                MyAccessibilityService.dismissPipIfActive(expiredPkg)
-            }, 500L)
-        }
-
-        runOnUiThread {
-            methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to expiredPkg))
-        }
-    }
-
-    fun bringLauncherToForegroundAndPrompt(packageName: String) {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            action = Intent.ACTION_MAIN
-            addCategory(Intent.CATEGORY_HOME)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra("intercepted_distraction_package", packageName)
-        }
-        startActivity(intent)
-        runOnUiThread {
-            methodChannel?.invokeMethod("onDistractionIntercepted", mapOf("packageName" to packageName))
-        }
-    }
-
-    fun terminateTargetApp(packageName: String) {
-        activeSessionPackage = packageName
-        enforceSessionExpiration()
-    }
-
-    fun notifySessionExtended(packageName: String, durationMinutes: Int) {
-        runOnUiThread {
-            methodChannel?.invokeMethod("onSessionExtended", mapOf("packageName" to packageName, "durationMinutes" to durationMinutes))
-        }
-    }
-
-    fun blockDistractionApp(packageName: String) {
-        runOnUiThread {
-            methodChannel?.invokeMethod("onBlockAppRequested", mapOf("packageName" to packageName))
-        }
-    }
-
-    fun notifySessionExpired(packageName: String) {
-        runOnUiThread {
-            methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to packageName))
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -1789,21 +1422,6 @@ class MainActivity : FlutterActivity() {
         if (isHomeAction) {
             runOnUiThread {
                 methodChannel?.invokeMethod("onHomePressed", null)
-            }
-        }
-        if (intent.hasExtra("intercepted_distraction_package")) {
-            val pkg = intent.getStringExtra("intercepted_distraction_package") ?: ""
-            intent.removeExtra("intercepted_distraction_package")
-            if (pkg.isNotEmpty()) {
-                runOnUiThread {
-                    methodChannel?.invokeMethod("onDistractionIntercepted", mapOf("packageName" to pkg))
-                }
-            }
-        }
-        if (intent.getBooleanExtra("timed_session_expired", false)) {
-            val pkg = intent.getStringExtra("expired_package") ?: ""
-            runOnUiThread {
-                methodChannel?.invokeMethod("onSessionExpired", mapOf("packageName" to pkg))
             }
         }
         if (intent.getBooleanExtra("trigger_recovery", false)) {
@@ -1816,9 +1434,6 @@ class MainActivity : FlutterActivity() {
     override fun onResume() {
         super.onResume()
         checkAndApplyBlackWallpaperOnHome()
-        if (activeSessionExpiryMillis > 0 && System.currentTimeMillis() >= activeSessionExpiryMillis) {
-            enforceSessionExpiration()
-        }
         if (intent.getBooleanExtra("trigger_recovery", false)) {
             intent.removeExtra("trigger_recovery")
             runOnUiThread {
@@ -1887,7 +1502,6 @@ class MainActivity : FlutterActivity() {
         }
         unregisterPackageChangeReceiver()
         unregisterProfileChangeReceiver()
-        sessionHandler.removeCallbacks(sessionExpiryRunnable)
         super.onDestroy()
     }
 }

@@ -131,7 +131,7 @@ class PermissionService extends GetxService {
         id: 'notification',
         title: 'Notifications',
         description: notification ? '✓ Enabled' : '⚠ Needs setup',
-        rationale: 'Required for timed access countdowns and expiration notices.',
+        rationale: 'Required for focus session and usage limit reminders.',
         isGranted: notification,
         isRequired: notifRequired,
         onAction: openNotificationSettings,

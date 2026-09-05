@@ -21,17 +21,9 @@ class MockNativeBridge extends GetxService implements NativeBridge {
   bool protectionEnabled = false;
 
   @override
-  void Function(String packageName)? onSessionExpired;
-  @override
   void Function()? onRecoveryTriggered;
   @override
   void Function(String packageName, String action)? onPackagesChanged;
-  @override
-  void Function(String packageName)? onDistractionIntercepted;
-  @override
-  void Function(String packageName, int durationMinutes)? onSessionExtended;
-  @override
-  void Function(String packageName)? onBlockAppRequested;
 
   @override
   Future<bool> hasUsagePermission() async => usageAccess;
@@ -114,22 +106,7 @@ class MockNativeBridge extends GetxService implements NativeBridge {
       };
 
   @override
-  Future<void> cancelTimedSession() async {}
-
-  @override
   Future<void> returnToLauncher() async {}
-
-  @override
-  Future<void> syncDistractionPackages(List<String> packages) async {}
-
-  @override
-  Future<void> startTimedSession({
-    required String packageName,
-    String? appName,
-    required int durationSeconds,
-    int? startedAtMillis,
-    int? expiresAtMillis,
-  }) async {}
 
   @override
   Future<void> expandStatusBar() async {}

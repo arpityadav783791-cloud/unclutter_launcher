@@ -17,11 +17,6 @@
     <!-- Notifications permission on Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Exact Alarm scheduling for reliable timed detox session enforcement -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
     <!-- Expand status bar / notifications panel -->
@@ -101,15 +96,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- BroadcastReceiver for Timed Detox Session Expiration and Ongoing Notification actions -->
-        <receiver
-            android:name=".SessionExpiryReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.minimal.launcher.ACTION_SESSION_EXPIRED" />
-                <action android:name="com.minimal.launcher.ACTION_END_SESSION" />
-            </intent-filter>
-        </receiver>
 
         <!-- Accessibility Service for Double-Tap Screen Locking -->
         <service

@@ -13,10 +13,6 @@ import '../../focus_mode/views/focus_blocked_view.dart';
 import '../../scheduled_block/controllers/schedule_controller.dart';
 import '../../scheduled_block/views/schedule_blocked_view.dart';
 
-import '../../apps/services/app_config_service.dart';
-import '../../distraction_apps/services/distraction_app_service.dart';
-import '../../timed_access/controllers/timed_access_controller.dart';
-
 import '../../../core/routes/app_routes.dart';
 import '../../../core/routes/app_router.dart';
 import '../../../core/services/native_bridge.dart';
@@ -33,9 +29,6 @@ class ProductivityController extends GetxController {
       Get.find<FocusModeController>();
   final ScheduleController _scheduleController =
       Get.find<ScheduleController>();
-  final AppConfigService _appConfigService = Get.find<AppConfigService>();
-  final TimedAccessController _timedAccessController =
-      Get.find<TimedAccessController>();
 
   /// Main entry point for launching an app.
   /// Runs all enabled productivity interventions in priority order:
@@ -43,8 +36,7 @@ class ProductivityController extends GetxController {
   /// 2. Scheduled Block (time-of-day block)
   /// 3. Daily Limit (usage cap reached)
   /// 4. Mindful Delay (friction timer)
-  /// 5. Timed Distraction Access (session allowance check)
-  /// 6. Direct Launch (if no restrictions apply or timed session active)
+  /// 5. Direct Launch (if no restrictions apply)
   Future<bool> handleAppLaunch(
     String packageName, {
     int userSerial = 0,
@@ -74,9 +66,6 @@ class ProductivityController extends GetxController {
       return false;
     }
 
-    final activeContext =
-        context ?? AppRouter.rootNavigatorKey.currentContext ?? Get.context;
-
     // 1. Focus Mode
     if (_focusModeController.isBlocked(packageName)) {
       return _showFocusBlocked(app);
@@ -96,24 +85,6 @@ class ProductivityController extends GetxController {
     // 4. Mindful Delay
     if (_mindfulDelayService.isEnabled(packageName)) {
       return _startMindfulDelay(app);
-    }
-
-    // 5. Timed Distraction Access
-    final isDistraction = Get.isRegistered<DistractionAppService>()
-        ? Get.find<DistractionAppService>().isDistraction(packageName, app: app)
-        : _appConfigService.isDistraction(packageName);
-    if (isDistraction) {
-      if (activeContext != null && activeContext.mounted) {
-        final allowed = await _timedAccessController.handleDistractionLaunch(
-          context: activeContext,
-          app: app,
-        );
-        if (!allowed) {
-          return false;
-        }
-      } else {
-        return false;
-      }
     }
 
     return _launch(app);
@@ -198,21 +169,6 @@ class ProductivityController extends GetxController {
       onComplete: () async {
         if (Get.context != null && Navigator.canPop(Get.context!)) {
           Navigator.pop(Get.context!);
-        }
-        final isDistractionApp = Get.isRegistered<DistractionAppService>()
-            ? Get.find<DistractionAppService>().isDistraction(app.packageName, app: app)
-            : _appConfigService.isDistraction(app.packageName);
-        if (isDistractionApp) {
-          final ctx = AppRouter.rootNavigatorKey.currentContext ?? Get.context;
-          if (ctx != null && ctx.mounted) {
-            final allowed = await _timedAccessController.handleDistractionLaunch(
-              context: ctx,
-              app: app,
-            );
-            if (!allowed) return;
-          } else {
-            return;
-          }
         }
         await _launch(app);
       },

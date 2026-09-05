@@ -8,12 +8,8 @@ class NativeBridge extends GetxService {
   static const MethodChannel _channel =
       MethodChannel('com.minimal.launcher/native');
 
-  void Function(String packageName)? onSessionExpired;
   void Function()? onRecoveryTriggered;
   void Function(String packageName, String action)? onPackagesChanged;
-  void Function(String packageName)? onDistractionIntercepted;
-  void Function(String packageName, int durationMinutes)? onSessionExtended;
-  void Function(String packageName)? onBlockAppRequested;
   void Function()? onHomePressed;
 
   @override
@@ -25,31 +21,6 @@ class NativeBridge extends GetxService {
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     if (call.method == 'onHomePressed') {
       onHomePressed?.call();
-      return true;
-    }
-    if (call.method == 'onSessionExpired') {
-      final args = call.arguments as Map<dynamic, dynamic>?;
-      final packageName = args?['packageName'] as String? ?? '';
-      onSessionExpired?.call(packageName);
-      return true;
-    }
-    if (call.method == 'onSessionExtended') {
-      final args = call.arguments as Map<dynamic, dynamic>?;
-      final packageName = args?['packageName'] as String? ?? '';
-      final durationMinutes = (args?['durationMinutes'] as num?)?.toInt() ?? 5;
-      onSessionExtended?.call(packageName, durationMinutes);
-      return true;
-    }
-    if (call.method == 'onBlockAppRequested') {
-      final args = call.arguments as Map<dynamic, dynamic>?;
-      final packageName = args?['packageName'] as String? ?? '';
-      onBlockAppRequested?.call(packageName);
-      return true;
-    }
-    if (call.method == 'onDistractionIntercepted') {
-      final args = call.arguments as Map<dynamic, dynamic>?;
-      final packageName = args?['packageName'] as String? ?? '';
-      onDistractionIntercepted?.call(packageName);
       return true;
     }
     if (call.method == 'onRecoveryTriggered') {
@@ -85,51 +56,12 @@ class NativeBridge extends GetxService {
     }
   }
 
-  /// Starts a native monitoring timer and usage overlay for a timed distraction session
-  Future<void> startTimedSession({
-    required String packageName,
-    String? appName,
-    required int durationSeconds,
-    int? startedAtMillis,
-    int? expiresAtMillis,
-  }) async {
-    try {
-      await _channel.invokeMethod('startTimedSession', {
-        'packageName': packageName,
-        'appName': appName,
-        'durationSeconds': durationSeconds,
-        'startedAtMillis': startedAtMillis,
-        'expiresAtMillis': expiresAtMillis,
-      });
-    } on PlatformException catch (e) {
-      Get.log('NativeBridge.startTimedSession error: ${e.message}');
-    }
-  }
-
-  /// Cancels any active native timed session
-  Future<void> cancelTimedSession() async {
-    try {
-      await _channel.invokeMethod('cancelTimedSession');
-    } on PlatformException catch (e) {
-      Get.log('NativeBridge.cancelTimedSession error: ${e.message}');
-    }
-  }
-
   /// Brings the launcher activity back to the foreground
   Future<void> returnToLauncher() async {
     try {
       await _channel.invokeMethod('returnToLauncher');
     } on PlatformException catch (e) {
       Get.log('NativeBridge.returnToLauncher error: ${e.message}');
-    }
-  }
-
-  /// Syncs configured distraction packages with Android native layer for notification interception
-  Future<void> syncDistractionPackages(List<String> packages) async {
-    try {
-      await _channel.invokeMethod('setDistractionPackages', {'packages': packages});
-    } on PlatformException {
-      // ignore
     }
   }
 

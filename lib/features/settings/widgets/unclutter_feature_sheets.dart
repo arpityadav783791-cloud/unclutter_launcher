@@ -15,11 +15,9 @@ import '../../launcher/widgets/app_rename_dialog.dart';
 /// Mindful Delay, Daily Limits, Scheduled Block, Hidden Apps, Renamed Apps, and Favorites.
 
 void showMindfulDelaySettingsSheet(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
+  final bgColor = AppColors.darkBackground;
 
   final delayService = Get.find<MindfulDelayService>();
   final appsController = Get.find<AppsController>();
@@ -146,11 +144,9 @@ void showMindfulDelaySettingsSheet(BuildContext context) {
 }
 
 void showDailyLimitsSettingsSheet(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
+  final bgColor = AppColors.darkBackground;
 
   final limitService = Get.find<DailyLimitService>();
   final appsController = Get.find<AppsController>();
@@ -280,11 +276,9 @@ void showDailyLimitsSettingsSheet(BuildContext context) {
 }
 
 void showScheduleBlockSettingsSheet(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? const Color(0xFF111111) : const Color(0xFFF9F9F9);
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
+  final bgColor = AppColors.darkBackground;
 
   final scheduleService = Get.find<ScheduleService>();
   final appsController = Get.find<AppsController>();
@@ -403,11 +397,9 @@ void showScheduleBlockSettingsSheet(BuildContext context) {
 }
 
 void showHiddenAppsManagerSheet(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
+  final bgColor = AppColors.darkBackground;
 
   final configService = Get.find<AppConfigService>();
   final appsController = Get.find<AppsController>();
@@ -533,11 +525,9 @@ void showHiddenAppsManagerSheet(BuildContext context) {
 }
 
 void showFavoritesManagerSheet(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
+  final bgColor = AppColors.darkBackground;
 
   final favoritesController = Get.find<FavoritesController>();
   final appsController = Get.find<AppsController>();
@@ -683,9 +673,8 @@ void _showAddFavoritePicker(
   FavoritesController favoritesController,
   VoidCallback onUpdated,
 ) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final bgColor = isDark ? AppColors.darkBackground : Colors.white;
+  final textColor = AppColors.darkText;
+  final bgColor = AppColors.darkBackground;
 
   showDialog(
     context: context,
@@ -712,7 +701,7 @@ void _showAddFavoritePicker(
                   ),
                 ),
                 trailing: isFav
-                    ? const Icon(Icons.check, size: 18, color: Colors.green)
+                    ? Icon(Icons.check, size: 18, color: textColor)
                     : null,
                 onTap: isFav
                     ? null
@@ -731,11 +720,9 @@ void _showAddFavoritePicker(
 }
 
 void showRenamedAppsManagerSheet(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
-  final bgColor = isDark ? AppColors.darkBackground : const Color(0xFFF9F9F9);
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
+  final bgColor = AppColors.darkBackground;
 
   final configService = Get.find<AppConfigService>();
   final appsController = Get.find<AppsController>();

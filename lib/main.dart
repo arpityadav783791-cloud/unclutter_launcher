@@ -19,8 +19,6 @@ import 'features/scheduled_block/controllers/schedule_controller.dart';
 import 'features/settings/services/settings_service.dart';
 import 'features/settings/services/daily_wallpaper_service.dart';
 import 'features/settings/controllers/settings_controller.dart';
-import 'features/timed_access/services/timed_access_service.dart';
-import 'features/timed_access/controllers/timed_access_controller.dart';
 import 'features/protected_mode/services/protected_mode_service.dart';
 import 'features/protected_mode/controllers/protected_mode_controller.dart';
 import 'core/services/permission_service.dart';
@@ -52,8 +50,6 @@ void main() async {
   Get.put(FocusModeController(), permanent: true);
   Get.put(ScheduleService(), permanent: true);
   Get.put(ScheduleController(), permanent: true);
-  Get.put(TimedAccessService(), permanent: true);
-  Get.put(TimedAccessController(), permanent: true);
   Get.put(ProtectedModeService(), permanent: true);
   Get.put(ProtectedModeController(), permanent: true);
   Get.put(SettingsService(), permanent: true);

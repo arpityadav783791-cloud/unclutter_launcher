@@ -115,7 +115,7 @@ class NotificationPage extends StatelessWidget {
                 ),
               ),
               child: MinimalText(
-                'Minimalist will only notify you when focus sessions end or your timed access expires.',
+                'Minimalist will only notify you for essential system and focus alerts.',
                 style: TextStyle(
                   fontSize: 14,
                   color: secondaryColor,

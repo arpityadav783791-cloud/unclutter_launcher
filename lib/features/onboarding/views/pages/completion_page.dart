@@ -87,14 +87,6 @@ class CompletionPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   _buildSummaryItem(
-                    isConfigured: true,
-                    configuredLabel: 'Timed access enabled',
-                    unconfiguredLabel: 'Timed access disabled',
-                    textColor: textColor,
-                    secondaryColor: secondaryColor,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildSummaryItem(
                     isConfigured: hasUsage,
                     configuredLabel: 'Screen-time tracking active',
                     unconfiguredLabel: 'Screen-time tracking skipped',

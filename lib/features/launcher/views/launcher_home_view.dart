@@ -15,7 +15,6 @@ import '../../favorites/controllers/favorites_controller.dart';
 import '../../productivity/controllers/productivity_controller.dart';
 import '../../search/controllers/search_controller.dart';
 import '../../settings/controllers/settings_controller.dart';
-import '../../timed_access/controllers/timed_access_controller.dart';
 import '../controllers/launcher_controller.dart';
 import '../services/home_gesture_service.dart';
 import '../widgets/app_options_bottom_sheet.dart';
@@ -113,9 +112,6 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
     final appsController = Get.find<AppsController>();
     final favoritesController = Get.find<FavoritesController>();
     final productivity = Get.find<ProductivityController>();
-    final timedAccess = Get.isRegistered<TimedAccessController>()
-        ? Get.find<TimedAccessController>()
-        : null;
     final searchController = Get.isRegistered<AppSearchController>()
         ? Get.find<AppSearchController>()
         : Get.put(AppSearchController(), permanent: true);
@@ -198,7 +194,6 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
                   appsController: appsController,
                   favoritesController: favoritesController,
                   productivity: productivity,
-                  timedAccess: timedAccess,
                   textColor: textColor,
                   secondaryColor: secondaryColor,
                 ),
@@ -227,7 +222,6 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
     required AppsController appsController,
     required FavoritesController favoritesController,
     required ProductivityController productivity,
-    required TimedAccessController? timedAccess,
     required Color textColor,
     required Color secondaryColor,
   }) {
@@ -263,56 +257,6 @@ class _LauncherHomeViewState extends State<LauncherHomeView>
               secondaryColor: secondaryColor,
               onLongPress: () => showHomeClockMenu(context),
             ),
-
-            // Active Distraction Session Indicator (if any)
-            if (timedAccess != null)
-              Obx(() {
-                final session = timedAccess.currentSession.value;
-                if (session == null || session.isExpired) {
-                  return const SizedBox.shrink();
-                }
-                final secs = timedAccess.remainingSeconds.value;
-                final m = secs ~/ 60;
-                final s = (secs % 60).toString().padLeft(2, '0');
-                return Container(
-                  margin: const EdgeInsets.only(top: 14),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF161616),
-                    borderRadius: AppRadius.borderSm,
-                    border: Border.all(color: const Color(0xFF262626)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      MinimalText(
-                        '⏳ ${session.appName}: $m:$s remaining',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: textColor,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          timedAccess.cancelSession();
-                        },
-                        child: MinimalText(
-                          'End',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: secondaryColor,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
 
             const SizedBox(height: 16),
 

@@ -80,10 +80,8 @@ class _SettingsViewState extends State<SettingsView>
     }
 
     if (focusController.isActive.value) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-      final secondaryColor =
-          isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+      final textColor = AppColors.darkText;
+      final secondaryColor = AppColors.darkSecondary;
 
       showModalBottomSheet(
         context: context,
@@ -124,14 +122,14 @@ class _SettingsViewState extends State<SettingsView>
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.15),
+                      color: textColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     alignment: Alignment.center,
-                    child: const MinimalText(
+                    child: MinimalText(
                       'Stop Focus Mode',
                       style: TextStyle(
-                        color: Colors.redAccent,
+                        color: textColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -149,10 +147,8 @@ class _SettingsViewState extends State<SettingsView>
   }
 
   void _showAppearanceSheet(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+    final textColor = AppColors.darkText;
+    final secondaryColor = AppColors.darkSecondary;
     final controller = Get.find<SettingsController>();
     final appsController =
         Get.isRegistered<AppsController>() ? Get.find<AppsController>() : null;
@@ -200,7 +196,7 @@ class _SettingsViewState extends State<SettingsView>
                   ),
                   const SizedBox(height: 4),
                   MinimalText(
-                    'Theme, typography, layout & gestures',
+                    'Typography, layout & gestures',
                     style: TextStyle(fontSize: 13, color: secondaryColor),
                   ),
                   const SizedBox(height: 16),
@@ -209,14 +205,7 @@ class _SettingsViewState extends State<SettingsView>
                       controller: scrollController,
                       physics: const BouncingScrollPhysics(),
                       children: [
-                        _SubSectionHeader('THEME & TYPOGRAPHY', secondaryColor),
-                        Obx(() => _SettingRow(
-                              title: 'Theme',
-                              value: controller.themeModeLabel,
-                              textColor: textColor,
-                              secondaryColor: secondaryColor,
-                              onTap: controller.cycleThemeMode,
-                            )),
+                        _SubSectionHeader('TYPOGRAPHY', secondaryColor),
                         Obx(() => _SettingRow(
                               title: 'Text size',
                               value: controller.textScaleLabel,
@@ -406,14 +395,12 @@ class _SettingsViewState extends State<SettingsView>
   }
 
   void _showTamperProtectionDialog(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+    final textColor = AppColors.darkText;
+    final secondaryColor = AppColors.darkSecondary;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
@@ -460,14 +447,14 @@ class _SettingsViewState extends State<SettingsView>
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.15),
+                      color: textColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     alignment: Alignment.center,
-                    child: const MinimalText(
+                    child: MinimalText(
                       '✓ Protection is Active',
                       style: TextStyle(
-                        color: AppColors.accent,
+                        color: textColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
                       ),
@@ -516,7 +503,7 @@ class _SettingsViewState extends State<SettingsView>
                           child: MinimalText(
                             'Enable Protection',
                             style: TextStyle(
-                              color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                              color: AppColors.darkBackground,
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
                             ),
@@ -535,10 +522,8 @@ class _SettingsViewState extends State<SettingsView>
   }
 
   void _showPermissionsSheet(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+    final textColor = AppColors.darkText;
+    final secondaryColor = AppColors.darkSecondary;
 
     showModalBottomSheet(
       context: context,
@@ -596,14 +581,10 @@ class _SettingsViewState extends State<SettingsView>
                       width: double.infinity,
                       padding: const EdgeInsets.all(AppSpacing.md),
                       decoration: BoxDecoration(
-                        color: allOperational
-                            ? AppColors.accent.withValues(alpha: 0.12)
-                            : Colors.amber.withValues(alpha: 0.12),
+                        color: textColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(AppRadius.md),
                         border: Border.all(
-                          color: allOperational
-                              ? AppColors.accent.withValues(alpha: 0.35)
-                              : Colors.amber.withValues(alpha: 0.35),
+                          color: textColor.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -614,9 +595,7 @@ class _SettingsViewState extends State<SettingsView>
                                 ? Icons.check_circle_outline
                                 : Icons.info_outline,
                             size: 22,
-                            color: allOperational
-                                ? AppColors.accent
-                                : Colors.amberAccent,
+                            color: textColor,
                           ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
@@ -630,9 +609,7 @@ class _SettingsViewState extends State<SettingsView>
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: allOperational
-                                        ? AppColors.accent
-                                        : Colors.amberAccent,
+                                    color: textColor,
                                   ),
                                 ),
                                 const SizedBox(height: AppSpacing.xxs),
@@ -696,12 +673,12 @@ class _SettingsViewState extends State<SettingsView>
                               },
                             )),
                         _SubDivider(secondaryColor),
-                        _SubSectionHeader('NOTIFICATIONS & TIMERS', secondaryColor),
+                        _SubSectionHeader('NOTIFICATIONS', secondaryColor),
                         Obx(() => _SettingRow(
                               title: 'Notification access',
                               subtitle: hasNotificationAccess.value
-                                  ? 'Session countdown & timer alerts active'
-                                  : 'Required for timed session notices & alerts',
+                                  ? 'Notification alerts active'
+                                  : 'Required for focus & system alerts',
                               value: hasNotificationAccess.value
                                   ? '✓ Enabled'
                                   : '⚠ Needs setup →',
@@ -788,10 +765,8 @@ class _SettingsViewState extends State<SettingsView>
   }
 
   void _showAboutSheet(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+    final textColor = AppColors.darkText;
+    final secondaryColor = AppColors.darkSecondary;
 
     showModalBottomSheet(
       context: context,
@@ -900,10 +875,8 @@ class _SettingsViewState extends State<SettingsView>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final secondaryColor =
-        isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+    final textColor = AppColors.darkText;
+    final secondaryColor = AppColors.darkSecondary;
 
     final horizontalPadding = AppTheme.horizontalPadding(context);
     final verticalPadding = AppTheme.verticalPadding(context);
@@ -959,7 +932,7 @@ class _SettingsViewState extends State<SettingsView>
                     _SubSectionHeader('APPEARANCE', secondaryColor),
                     _UnclutterSettingTile(
                       title: 'Appearance',
-                      subtitle: 'Theme, text size, home screen layout & gestures',
+                      subtitle: 'Text size, home screen layout & gestures',
                       onTap: () => _showAppearanceSheet(context),
                       textColor: textColor,
                       secondaryColor: secondaryColor,
@@ -975,8 +948,8 @@ class _SettingsViewState extends State<SettingsView>
                       secondaryColor: secondaryColor,
                     ),
                     _UnclutterSettingTile(
-                      title: 'App Limits & Timed Access',
-                      subtitle: 'Daily usage caps & timed access duration',
+                      title: 'App Limits',
+                      subtitle: 'Daily usage caps & restrictions',
                       onTap: () => showDailyLimitsSettingsSheet(context),
                       textColor: textColor,
                       secondaryColor: secondaryColor,
@@ -1149,7 +1122,7 @@ class _UnclutterSettingTile extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: trailingText!.contains('✓')
-                      ? AppColors.accent
+                      ? textColor
                       : secondaryColor.withValues(alpha: 0.75),
                 ),
               ),
@@ -1234,7 +1207,7 @@ class _SettingRow extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: toggleValue!
-                      ? AppColors.accent
+                      ? textColor
                       : secondaryColor.withValues(alpha: 0.45),
                 ),
               )
@@ -1244,7 +1217,7 @@ class _SettingRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: value!.contains('✓') ? AppColors.accent : secondaryColor,
+                  color: value!.contains('✓') ? textColor : secondaryColor,
                 ),
               ),
           ],

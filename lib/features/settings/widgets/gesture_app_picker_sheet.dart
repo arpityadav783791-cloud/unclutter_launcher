@@ -13,10 +13,8 @@ void showGestureAppPickerSheet(
   BuildContext context, {
   required bool isLeft,
 }) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-  final secondaryColor =
-      isDark ? AppColors.darkSecondary : AppColors.lightSecondary;
+  final textColor = AppColors.darkText;
+  final secondaryColor = AppColors.darkSecondary;
   final appsController = Get.find<AppsController>();
   final settings = Get.find<SettingsController>();
 
@@ -30,8 +28,7 @@ void showGestureAppPickerSheet(
 
   showModalBottomSheet(
     context: context,
-    backgroundColor:
-        isDark ? AppColors.darkBackground : const Color(0xFFF5F5F5),
+    backgroundColor: AppColors.darkBackground,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -83,9 +80,7 @@ void showGestureAppPickerSheet(
                         color: secondaryColor.withValues(alpha: 0.5),
                       ),
                       filled: true,
-                      fillColor: isDark
-                          ? const Color(0xFF1A1A1A)
-                          : const Color(0xFFEBEBEB),
+                      fillColor: const Color(0xFF1A1A1A),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 10,
@@ -122,11 +117,11 @@ void showGestureAppPickerSheet(
                             ),
                           ),
                           if (currentPkg == null || currentPkg.isEmpty)
-                            const MinimalText(
+                            MinimalText(
                               '✓',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: AppColors.accent,
+                                color: textColor,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -192,11 +187,11 @@ void showGestureAppPickerSheet(
                                     ),
                                   ),
                                   if (isSelected)
-                                    const MinimalText(
+                                    MinimalText(
                                       '✓',
                                       style: TextStyle(
                                         fontSize: 16,
-                                        color: AppColors.accent,
+                                        color: textColor,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),

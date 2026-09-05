@@ -6,7 +6,6 @@ import '../widgets/onboarding_progress.dart';
 import 'pages/welcome_page.dart';
 import 'pages/how_it_works_page.dart';
 import 'pages/distraction_apps_page.dart';
-import 'pages/timed_access_page.dart';
 import 'pages/usage_access_page.dart';
 import 'pages/notification_page.dart';
 import 'pages/launcher_setup_page.dart';
@@ -81,8 +80,6 @@ class OnboardingView extends StatelessWidget {
           controller: controller,
           onNext: controller.nextStep,
         );
-      case OnboardingStepType.timedAccess:
-        return TimedAccessPage(onNext: controller.nextStep);
       case OnboardingStepType.usageAccess:
         return UsageAccessPage(
           controller: controller,

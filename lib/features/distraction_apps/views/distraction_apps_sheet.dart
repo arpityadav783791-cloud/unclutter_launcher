@@ -115,7 +115,7 @@ void showDistractionAppsManagerSheet(BuildContext context) {
                     ),
                   ),
                   child: MinimalText(
-                    'Apps marked as distractions will require you to choose a time before they can be opened.',
+                    'Apps marked as distractions are prioritized for digital detox and mindful usage.',
                     style: TextStyle(
                       fontSize: 12,
                       color: secondaryColor.withValues(alpha: 0.8),
