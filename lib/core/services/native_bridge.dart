@@ -11,6 +11,10 @@ class NativeBridge extends GetxService {
   void Function()? onRecoveryTriggered;
   void Function(String packageName, String action)? onPackagesChanged;
   void Function()? onHomePressed;
+  void Function(String sessionId, String packageName)? onTimedAccessExpired;
+  void Function(String sessionId, String packageName)? onSessionTerminated;
+  void Function(String packageName)? onDistractionIntercepted;
+  void Function(String sessionId, String packageName, int expiresAt)? onSessionExtended;
 
   @override
   void onInit() {
@@ -34,7 +38,113 @@ class NativeBridge extends GetxService {
       onPackagesChanged?.call(packageName, action);
       return true;
     }
+    if (call.method == 'onTimedAccessExpired') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final sessionId = args?['sessionId'] as String? ?? '';
+      final packageName = args?['packageName'] as String? ?? '';
+      onTimedAccessExpired?.call(sessionId, packageName);
+      return true;
+    }
+    if (call.method == 'onSessionTerminated') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final sessionId = args?['sessionId'] as String? ?? '';
+      final packageName = args?['packageName'] as String? ?? '';
+      onSessionTerminated?.call(sessionId, packageName);
+      return true;
+    }
+    if (call.method == 'onDistractionIntercepted') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final packageName = args?['packageName'] as String? ?? '';
+      onDistractionIntercepted?.call(packageName);
+      return true;
+    }
+    if (call.method == 'onSessionExtended') {
+      final args = call.arguments as Map<dynamic, dynamic>?;
+      final sessionId = args?['sessionId'] as String? ?? '';
+      final packageName = args?['packageName'] as String? ?? '';
+      final expiresAt = args?['expiresAt'] as int? ?? 0;
+      onSessionExtended?.call(sessionId, packageName, expiresAt);
+      return true;
+    }
     return null;
+  }
+
+  /// Registers native monitoring for a timed distraction session
+  Future<bool> startTimedAccessMonitoring({
+    required String sessionId,
+    required String packageName,
+    required int expiresAtMillis,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('startTimedSession', {
+        'sessionId': sessionId,
+        'packageName': packageName,
+        'expiresAt': expiresAtMillis,
+      });
+      return result ?? true;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return true;
+    }
+  }
+
+  /// Clears native monitoring timer/alarms for a timed distraction session
+  Future<void> stopTimedAccessMonitoring({String? sessionId}) async {
+    try {
+      await _channel.invokeMethod('clearTimedSession', {
+        if (sessionId != null) 'sessionId': sessionId,
+      });
+    } on PlatformException {
+      // Silently ignore
+    } on MissingPluginException {
+      // Silently ignore
+    }
+  }
+
+  /// Requests native authoritative termination of a timed access session.
+  Future<bool> terminateTimedSession({required String sessionId}) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('terminateTimedSession', {
+        'sessionId': sessionId,
+      });
+      return result ?? true;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return true;
+    }
+  }
+
+  /// Requests native session extension.
+  Future<bool> extendTimedSession({
+    required String sessionId,
+    required int addedDurationMs,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('extendTimedSession', {
+        'sessionId': sessionId,
+        'addedDurationMs': addedDurationMs,
+      });
+      return result ?? true;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return true;
+    }
+  }
+
+  /// Updates configured distraction packages on native side for accessibility enforcement.
+  Future<void> setDistractionPackages(List<String> packages) async {
+    try {
+      await _channel.invokeMethod('setDistractionPackages', {
+        'packages': packages,
+      });
+    } on PlatformException {
+      // Silently ignore
+    } on MissingPluginException {
+      // Silently ignore
+    }
   }
 
   /// Returns true if this app is currently the default home launcher

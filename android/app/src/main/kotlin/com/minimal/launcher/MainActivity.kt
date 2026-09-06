@@ -305,9 +305,66 @@ class MainActivity : FlutterActivity() {
                     "openDeviceSettings" -> {
                         result.success(openDeviceSettings())
                     }
+                    // ── Timed Access Monitoring ───────────────────
+                    "startTimedSession" -> {
+                        val sessionId = call.argument<String>("sessionId")
+                        val packageName = call.argument<String>("packageName")
+                        val expiresAt = call.argument<Number>("expiresAt")?.toLong() ?: 0L
+                        if (sessionId.isNullOrBlank() || packageName.isNullOrBlank() || expiresAt <= 0L) {
+                            result.error("INVALID_ARGUMENT", "sessionId, packageName, and expiresAt required", null)
+                        } else {
+                            startTimedSession(sessionId, packageName, expiresAt)
+                            result.success(true)
+                        }
+                    }
+                    "clearTimedSession" -> {
+                        val sessionId = call.argument<String>("sessionId")
+                        clearTimedSession(sessionId)
+                        result.success(true)
+                    }
+                    "terminateTimedSession" -> {
+                        val sessionId = call.argument<String>("sessionId")
+                        if (sessionId.isNullOrBlank()) {
+                            result.error("INVALID_ARGUMENT", "sessionId is required", null)
+                        } else {
+                            if (timedSessionId == sessionId) {
+                                executeAuthoritativeTermination(sessionId, timedSessionPackage ?: "")
+                                result.success(true)
+                            } else {
+                                // Stale session ID or mismatch -> safely ignore
+                                result.success(false)
+                            }
+                        }
+                    }
+                    "extendTimedSession" -> {
+                        val sessionId = call.argument<String>("sessionId") ?: ""
+                        val addedDurationMs = (call.argument<Number>("addedDurationMs"))?.toLong() ?: (5 * 60 * 1000L)
+                        val pkg = timedSessionPackage ?: TimedAccessStateStore.getActiveSession(this)?.packageName ?: ""
+                        val success = handleOverlayExtend(sessionId, pkg, addedDurationMs)
+                        result.success(success)
+                    }
+                    "setDistractionPackages" -> {
+                        val packages = call.argument<List<String>>("packages") ?: emptyList()
+                        distractionPackages.clear()
+                        distractionPackages.addAll(packages)
+                        TimedAccessStateStore.setDistractionPackages(this@MainActivity, packages.toSet())
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }
+
+        // Restore native session authority if persisted
+        val existingSession = TimedAccessStateStore.getActiveSession(this)
+        if (existingSession != null && existingSession.expiresAt > System.currentTimeMillis()) {
+            timedSessionId = existingSession.sessionId
+            timedSessionPackage = existingSession.packageName
+            timedSessionExpiresAt = existingSession.expiresAt
+            distractionPackages.add(existingSession.packageName)
+        }
+        distractionPackages.addAll(TimedAccessStateStore.getDistractionPackages(this))
+
+        handleTimedAccessIntent(intent)
 
         registerPackageChangeReceiver()
         registerProfileChangeReceiver()
@@ -1429,6 +1486,7 @@ class MainActivity : FlutterActivity() {
                 methodChannel?.invokeMethod("onRecoveryTriggered", null)
             }
         }
+        handleTimedAccessIntent(intent)
     }
 
     override fun onResume() {
@@ -1496,10 +1554,395 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun handleTimedAccessIntent(intent: Intent?) {
+        val expiredId = intent?.getStringExtra("timed_access_expired_session_id")
+        val expiredPkg = intent?.getStringExtra("timed_access_expired_package")
+        if (!expiredId.isNullOrBlank() && !expiredPkg.isNullOrBlank()) {
+            timedSessionHandler.postDelayed({
+                notifyTimedAccessExpired(expiredId, expiredPkg)
+            }, 300)
+        }
+    }
+
+    // ── Timed Access Monitoring Subsystem ──────────────────────
+    private var timedSessionId: String? = null
+    private var timedSessionPackage: String? = null
+    private var timedSessionExpiresAt: Long = 0L
+    private val timedSessionHandler = Handler(Looper.getMainLooper())
+    private val timedSessionRunnable = Runnable {
+        triggerTimedAccessExpiry()
+    }
+    private val distractionPackages: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    private val isTerminating = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    fun isDistractionApp(pkg: String): Boolean {
+        return TimedAccessStateStore.isDistractionPackage(this, pkg) ||
+               distractionPackages.contains(pkg) ||
+               timedSessionPackage == pkg
+    }
+
+    fun isSessionValidFor(pkg: String): Boolean {
+        return TimedAccessStateStore.isSessionValid(this, pkg)
+    }
+
+    fun bringLauncherToFront() {
+        try {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "bringLauncherToFront failed: ${e.message}")
+        }
+    }
+
+    fun notifyDistractionIntercepted(packageName: String) {
+        timedSessionHandler.post {
+            methodChannel?.invokeMethod("onDistractionIntercepted", mapOf(
+                "packageName" to packageName
+            ))
+        }
+    }
+
+    private fun pauseMedia() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val playbackAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                    val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(playbackAttributes)
+                        .setAcceptsDelayedFocusGain(false)
+                        .setOnAudioFocusChangeListener { /* no-op */ }
+                        .build()
+                    audioManager.requestAudioFocus(focusRequest)
+                    timedSessionHandler.postDelayed({
+                        try { audioManager.abandonAudioFocusRequest(focusRequest) } catch (_: Exception) {}
+                    }, 400)
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+                    timedSessionHandler.postDelayed({
+                        @Suppress("DEPRECATION")
+                        try { audioManager.abandonAudioFocus(null) } catch (_: Exception) {}
+                    }, 400)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "pauseMedia failed: ${e.message}")
+        }
+    }
+
+    fun executeAuthoritativeTermination(sessionId: String, targetPackage: String) {
+        if (!isTerminating.compareAndSet(false, true)) {
+            Log.d("TimedAccess", "executeAuthoritativeTermination ignored (already terminating): [sessionId=$sessionId, pkg=$targetPackage]")
+            return
+        }
+        Log.d("TimedAccess", "executeAuthoritativeTermination starting: [sessionId=$sessionId, pkg=$targetPackage]")
+
+        // Dismiss any active overlay immediately
+        UsageTimerOverlayManager.dismiss()
+        TimedAccessStateStore.setSessionState(this, TimedAccessStateStore.STATE_TERMINATING)
+
+        try {
+            // 1. Cancel pending native Handler callbacks
+            try {
+                timedSessionHandler.removeCallbacks(timedSessionRunnable)
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "Handler cancel failed: ${e.message}")
+            }
+
+            // 2. Cancel exact AlarmManager expiry PendingIntent
+            try {
+                cancelAlarm()
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "Alarm cancel failed: ${e.message}")
+            }
+
+            // 3. Pause media playback
+            try {
+                pauseMedia()
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "pauseMedia failed: ${e.message}")
+            }
+
+            // 4. Perform Back where appropriate
+            try {
+                MyAccessibilityService.pressBack()
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "pressBack failed: ${e.message}")
+            }
+
+            // 5. Perform Home exit protocol
+            try {
+                MyAccessibilityService.goHome()
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "goHome failed: ${e.message}")
+            }
+            try {
+                val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_HOME)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                startActivity(homeIntent)
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "Home intent launch failed: ${e.message}")
+            }
+
+            // 6. Attempt PiP dismissal through existing AccessibilityService
+            try {
+                MyAccessibilityService.dismissPip(targetPackage)
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "PiP dismissal failed: ${e.message}")
+            }
+
+            // 7. Remove target application task from Recents / Overview
+            try {
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val appTasks = am?.appTasks
+                    if (appTasks != null) {
+                        for (task in appTasks) {
+                            val basePkg = task.taskInfo?.baseIntent?.component?.packageName
+                            if (basePkg == targetPackage) {
+                                task.finishAndRemoveTask()
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "Task removal failed: ${e.message}")
+            }
+
+            // 8. Request background process cleanup where Android permits it
+            try {
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                am?.killBackgroundProcesses(targetPackage)
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "killBackgroundProcesses failed: ${e.message}")
+            }
+
+            // 9. Apply existing Device Owner enforcement if app is Device Owner
+            try {
+                if (protectedModeManager.isDeviceOwner()) {
+                    val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+                    val adminComponent = ComponentName(this, ProtectedDeviceAdminReceiver::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        dpm?.setPackagesSuspended(adminComponent, arrayOf(targetPackage), true)
+                        timedSessionHandler.postDelayed({
+                            try {
+                                dpm?.setPackagesSuspended(adminComponent, arrayOf(targetPackage), false)
+                            } catch (_: Exception) {}
+                        }, 500)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "Device Owner suspension failed: ${e.message}")
+            }
+
+            // 10. Return Unclutter/MainActivity to foreground
+            try {
+                bringLauncherToFront()
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "bringLauncherToFront failed: ${e.message}")
+            }
+
+            // 11. Delayed PiP checks (at 250ms and 500ms) because PiP can appear asynchronously
+            timedSessionHandler.postDelayed({
+                try {
+                    MyAccessibilityService.dismissPip(targetPackage)
+                } catch (_: Exception) {}
+            }, 250)
+            timedSessionHandler.postDelayed({
+                try {
+                    MyAccessibilityService.dismissPip(targetPackage)
+                } catch (_: Exception) {}
+            }, 500)
+
+            // 12. Notify Flutter that the session was terminated
+            timedSessionHandler.post {
+                try {
+                    methodChannel?.invokeMethod("onSessionTerminated", mapOf(
+                        "sessionId" to sessionId,
+                        "packageName" to targetPackage
+                    ))
+                } catch (e: Exception) {
+                    Log.w("TimedAccess", "onSessionTerminated invoke failed: ${e.message}")
+                }
+            }
+
+            // 13. Clear native session state & persistence
+            try {
+                TimedAccessStateStore.clearSession(this, sessionId)
+            } catch (e: Exception) {
+                Log.w("TimedAccess", "clearSession failed: ${e.message}")
+            }
+            timedSessionId = null
+            timedSessionPackage = null
+            timedSessionExpiresAt = 0L
+        } finally {
+            isTerminating.set(false)
+        }
+    }
+
+    private fun startTimedSession(sessionId: String, packageName: String, expiresAt: Long) {
+        // Cancel previous session & alarms cleanly
+        clearTimedSession(null)
+        UsageTimerOverlayManager.dismiss()
+
+        timedSessionId = sessionId
+        timedSessionPackage = packageName
+        timedSessionExpiresAt = expiresAt
+        distractionPackages.add(packageName)
+
+        // Persist authoritatively in native storage with ACTIVE state
+        TimedAccessStateStore.saveSession(this, sessionId, packageName, expiresAt, TimedAccessStateStore.STATE_ACTIVE)
+
+        // Schedule Handler callback for current session
+        val delayMs = Math.max(0L, expiresAt - System.currentTimeMillis())
+        timedSessionHandler.removeCallbacks(timedSessionRunnable)
+        timedSessionHandler.postDelayed(timedSessionRunnable, delayMs)
+
+        // Schedule exact AlarmManager alarm
+        scheduleAlarm(sessionId, packageName, expiresAt)
+    }
+
+    fun handleOverlayExtend(sessionId: String, packageName: String, addedDurationMs: Long): Boolean {
+        return try {
+            UsageTimerOverlayManager.dismiss()
+
+            val active = TimedAccessStateStore.getActiveSession(this)
+            val effectiveSessionId = if (sessionId.isNotBlank()) sessionId else active?.sessionId ?: ""
+            val effectivePkg = if (packageName.isNotBlank()) packageName else active?.packageName ?: ""
+
+            if (effectiveSessionId.isBlank() || effectivePkg.isBlank()) {
+                false
+            } else {
+                val newExpiresAt = System.currentTimeMillis() + addedDurationMs
+                timedSessionId = effectiveSessionId
+                timedSessionPackage = effectivePkg
+                timedSessionExpiresAt = newExpiresAt
+
+                // Save to native store with ACTIVE state
+                TimedAccessStateStore.saveSession(this, effectiveSessionId, effectivePkg, newExpiresAt, TimedAccessStateStore.STATE_ACTIVE)
+
+                // Reschedule Handler callback
+                timedSessionHandler.removeCallbacks(timedSessionRunnable)
+                timedSessionHandler.postDelayed(timedSessionRunnable, addedDurationMs)
+
+                // Reschedule exact AlarmManager alarm
+                scheduleAlarm(effectiveSessionId, effectivePkg, newExpiresAt)
+
+                // Notify Flutter
+                timedSessionHandler.post {
+                    methodChannel?.invokeMethod("onSessionExtended", mapOf(
+                        "sessionId" to effectiveSessionId,
+                        "packageName" to effectivePkg,
+                        "expiresAt" to newExpiresAt
+                    ))
+                }
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "handleOverlayExtend failed: ${e.message}", e)
+            false
+        }
+    }
+
+    private fun scheduleAlarm(sessionId: String, packageName: String, expiresAt: Long) {
+        try {
+            cancelAlarm()
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            val intent = Intent(this, TimedExpiryReceiver::class.java).apply {
+                putExtra("sessionId", sessionId)
+                putExtra("packageName", packageName)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                9090,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, expiresAt, pendingIntent)
+            } else {
+                alarmManager?.setExact(AlarmManager.RTC_WAKEUP, expiresAt, pendingIntent)
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "AlarmManager scheduling failed: ${e.message}")
+        }
+    }
+
+    private fun cancelAlarm() {
+        try {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            val intent = Intent(this, TimedExpiryReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                9090,
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            if (pendingIntent != null) {
+                alarmManager?.cancel(pendingIntent)
+                pendingIntent.cancel()
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "AlarmManager cancel failed: ${e.message}")
+        }
+    }
+
+    private fun clearTimedSession(sessionId: String?) {
+        if (sessionId == null || timedSessionId == sessionId) {
+            UsageTimerOverlayManager.dismiss()
+            timedSessionHandler.removeCallbacks(timedSessionRunnable)
+            cancelAlarm()
+            TimedAccessStateStore.clearSession(this, sessionId)
+            timedSessionId = null
+            timedSessionPackage = null
+            timedSessionExpiresAt = 0L
+        }
+    }
+
+    fun triggerTimedAccessExpiry() {
+        val sId = timedSessionId ?: return
+        val pkg = timedSessionPackage ?: return
+        notifyTimedAccessExpired(sId, pkg)
+    }
+
+    fun notifyTimedAccessExpired(sessionId: String, packageName: String) {
+        // Stale callback protection: ignore if not matching active session
+        val active = TimedAccessStateStore.getActiveSession(this)
+        if (active != null && active.sessionId != sessionId) {
+            Log.w("MainActivity", "Ignoring stale notifyTimedAccessExpired for $sessionId (active: ${active.sessionId})")
+            return
+        }
+
+        // Set native state to EXPIRED_WAITING
+        TimedAccessStateStore.setSessionState(this, TimedAccessStateStore.STATE_EXPIRED_WAITING)
+
+        // Layer 1: Display native overlay over target app (Target app stays underneath! NO Home!)
+        UsageTimerOverlayManager.showExpiryOverlay(this, sessionId, packageName)
+
+        if (timedSessionId == null || timedSessionId == sessionId) {
+            timedSessionHandler.post {
+                methodChannel?.invokeMethod("onTimedAccessExpired", mapOf(
+                    "sessionId" to sessionId,
+                    "packageName" to packageName
+                ))
+            }
+        }
+    }
+
     override fun onDestroy() {
         if (instance === this) {
             instance = null
         }
+        UsageTimerOverlayManager.dismiss()
+        timedSessionHandler.removeCallbacks(timedSessionRunnable)
         unregisterPackageChangeReceiver()
         unregisterProfileChangeReceiver()
         super.onDestroy()
